@@ -17,6 +17,8 @@
 
 #include "nav2_behavior_tree/plugins/action/navigate_through_poses_action.hpp"
 
+#include "spdlog_wrapper.hpp"
+
 namespace nav2_behavior_tree
 {
 
@@ -30,6 +32,7 @@ NavigateThroughPosesAction::NavigateThroughPosesAction(
 
 void NavigateThroughPosesAction::on_tick()
 {
+  LOG_TRACE("BT plugin function entry: NavigateThroughPosesAction::on_tick");
   if (!getInput("goals", goal_.poses)) {
     RCLCPP_ERROR(
       node_->get_logger(),
@@ -44,6 +47,7 @@ void NavigateThroughPosesAction::on_tick()
 #include "behaviortree_cpp_v3/bt_factory.h"
 BT_REGISTER_NODES(factory)
 {
+  LOG_INFO("Registering BT plugin nodes from nav2_ws/src/navigation2/nav2_behavior_tree/plugins/action/navigate_through_poses_action.cpp");
   BT::NodeBuilder builder =
     [](const std::string & name, const BT::NodeConfiguration & config)
     {

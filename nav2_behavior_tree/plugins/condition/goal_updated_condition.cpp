@@ -16,6 +16,8 @@
 #include <vector>
 #include "nav2_behavior_tree/plugins/condition/goal_updated_condition.hpp"
 
+#include "spdlog_wrapper.hpp"
+
 namespace nav2_behavior_tree
 {
 
@@ -27,6 +29,7 @@ GoalUpdatedCondition::GoalUpdatedCondition(
 
 BT::NodeStatus GoalUpdatedCondition::tick()
 {
+  LOG_TRACE("BT plugin function entry: GoalUpdatedCondition::tick");
   if (status() == BT::NodeStatus::IDLE) {
     config().blackboard->get<std::vector<geometry_msgs::msg::PoseStamped>>("goals", goals_);
     config().blackboard->get<geometry_msgs::msg::PoseStamped>("goal", goal_);
@@ -52,5 +55,6 @@ BT::NodeStatus GoalUpdatedCondition::tick()
 #include "behaviortree_cpp_v3/bt_factory.h"
 BT_REGISTER_NODES(factory)
 {
+  LOG_INFO("Registering BT plugin nodes from nav2_ws/src/navigation2/nav2_behavior_tree/plugins/condition/goal_updated_condition.cpp");
   factory.registerNodeType<nav2_behavior_tree::GoalUpdatedCondition>("GoalUpdated");
 }

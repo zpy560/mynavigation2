@@ -20,6 +20,8 @@
 
 #include "nav2_behavior_tree/plugins/condition/time_expired_condition.hpp"
 
+#include "spdlog_wrapper.hpp"
+
 namespace nav2_behavior_tree
 {
 
@@ -29,6 +31,7 @@ TimeExpiredCondition::TimeExpiredCondition(
 : BT::ConditionNode(condition_name, conf),
   period_(1.0)
 {
+  LOG_TRACE("BT plugin function entry: TimeExpiredCondition::TimeExpiredCondition");
   getInput("seconds", period_);
   node_ = config().blackboard->get<rclcpp::Node::SharedPtr>("node");
   start_ = node_->now();
@@ -36,6 +39,7 @@ TimeExpiredCondition::TimeExpiredCondition(
 
 BT::NodeStatus TimeExpiredCondition::tick()
 {
+  LOG_TRACE("BT plugin function entry: TimeExpiredCondition::tick");
   if (status() == BT::NodeStatus::IDLE) {
     start_ = node_->now();
     return BT::NodeStatus::FAILURE;
@@ -60,5 +64,6 @@ BT::NodeStatus TimeExpiredCondition::tick()
 #include "behaviortree_cpp_v3/bt_factory.h"
 BT_REGISTER_NODES(factory)
 {
+  LOG_INFO("Registering BT plugin nodes from nav2_ws/src/navigation2/nav2_behavior_tree/plugins/condition/time_expired_condition.cpp");
   factory.registerNodeType<nav2_behavior_tree::TimeExpiredCondition>("TimeExpired");
 }

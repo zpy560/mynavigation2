@@ -23,7 +23,7 @@
           </RecoveryNode>
         </RateController>
         <RecoveryNode number_of_retries="1" name="RecoveryFollowPath">
-          <FollowPath path="{path}" controller_id="FollowPath"/>
+          <FollowPath path="{path}" controller_id=""/>
           <ClearEntireCostmap name="ClearLocalCostmap-Context" service_name="local_costmap/clear_entirely_local_costmap"/>
         </RecoveryNode>
       </PipelineSequence>
@@ -42,3 +42,16 @@
     </RecoveryNode>
   </BehaviorTree>
 </root>
+
+<!--
+中文说明：
+1. 这棵树只在路径失效或目标更新时才重规划，并保留完整恢复逻辑。
+2. RateControllerComputePathToPose 以 1Hz 检查规划分支；FallbackComputePathToPose 先尝试复用路径。
+3. CheckIfNewPathNeeded 中，GlobalUpdatedGoal 经过 Inverter 后表示目标未更新，IsPathValid 表示
+   当前 blackboard["path"] 仍然可用；两者都成功则不触发 ComputePathToPose。
+4. 如果目标更新或路径无效，Fallback 执行 ComputePathToPose，使用 {goal} 重新生成 {path}。
+5. RecoveryComputePathToPose 对规划失败做局部恢复：清理 global_costmap 后重试一次。
+6. RecoveryFollowPath 对控制失败做局部恢复：清理 local_costmap 后重试一次。
+7. 顶层 NavigateRecovery 失败后进入 FallbackRecoveries：新目标可打断恢复，否则轮询清理、
+   Spin、Wait、BackUp，再回到主流程。
+-->

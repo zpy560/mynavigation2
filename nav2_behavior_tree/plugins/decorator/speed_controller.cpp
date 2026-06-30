@@ -20,6 +20,8 @@
 
 #include "nav2_behavior_tree/plugins/decorator/speed_controller.hpp"
 
+#include "spdlog_wrapper.hpp"
+
 namespace nav2_behavior_tree
 {
 
@@ -34,6 +36,7 @@ SpeedController::SpeedController(
   min_speed_(0.0),
   max_speed_(0.5)
 {
+  LOG_TRACE("BT plugin function entry: SpeedController::SpeedController");
   node_ = config().blackboard->get<rclcpp::Node::SharedPtr>("node");
 
   getInput("min_rate", min_rate_);
@@ -58,6 +61,7 @@ SpeedController::SpeedController(
 
 inline BT::NodeStatus SpeedController::tick()
 {
+  LOG_TRACE("BT plugin function entry: SpeedController::tick");
   if (status() == BT::NodeStatus::IDLE) {
     // Reset since we're starting a new iteration of
     // the speed controller (moving from IDLE to RUNNING)
@@ -123,5 +127,6 @@ inline BT::NodeStatus SpeedController::tick()
 #include "behaviortree_cpp_v3/bt_factory.h"
 BT_REGISTER_NODES(factory)
 {
+  LOG_INFO("Registering BT plugin nodes from nav2_ws/src/navigation2/nav2_behavior_tree/plugins/decorator/speed_controller.cpp");
   factory.registerNodeType<nav2_behavior_tree::SpeedController>("SpeedController");
 }

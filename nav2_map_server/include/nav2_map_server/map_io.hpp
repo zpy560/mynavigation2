@@ -30,6 +30,8 @@ namespace nav2_map_server
 
 struct LoadParameters
 {
+  // YAML metadata layer: file path, metric scale, world origin, thresholds, mode, and negate.
+  // 中文：YAML 元数据层，描述图像路径、分辨率、世界坐标原点、阈值、模式和黑白翻转规则。
   std::string image_file_name;
   double resolution{0};
   std::vector<double> origin{0, 0, 0};
@@ -49,6 +51,7 @@ typedef enum
 
 /**
  * @brief Load and parse the given YAML file
+ * 中文：读取地图三层结构的第一层：YAML 元数据层。
  * @param yaml_filename Name of the map file passed though parameter
  * @return Map loading parameters obtained from YAML file
  * @throw YAML::Exception
@@ -57,6 +60,7 @@ LoadParameters loadMapYaml(const std::string & yaml_filename);
 
 /**
  * @brief Load the image from map file and generate an OccupancyGrid
+ * 中文：读取地图三层结构的第二层，并转换为第三层：image 像素层 -> OccupancyGrid 消息层。
  * @param load_parameters Parameters of loading map
  * @param map Output loaded map
  * @throw std::exception
@@ -68,6 +72,7 @@ void loadMapFromFile(
 /**
  * @brief Load the map YAML, image from map file and
  * generate an OccupancyGrid
+ * 中文：完整加载链路：YAML 元数据层 -> image 像素层 -> OccupancyGrid 消息层。
  * @param yaml_file Name of input YAML file
  * @param map Output loaded map
  * @return status of map loaded

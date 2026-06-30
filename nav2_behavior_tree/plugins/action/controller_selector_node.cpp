@@ -22,6 +22,8 @@
 
 #include "rclcpp/rclcpp.hpp"
 
+#include "spdlog_wrapper.hpp"
+
 namespace nav2_behavior_tree
 {
 
@@ -32,6 +34,7 @@ ControllerSelector::ControllerSelector(
   const BT::NodeConfiguration & conf)
 : BT::SyncActionNode(name, conf)
 {
+  LOG_TRACE("BT plugin function entry: ControllerSelector::ControllerSelector");
   node_ = config().blackboard->get<rclcpp::Node::SharedPtr>("node");
   callback_group_ = node_->create_callback_group(
     rclcpp::CallbackGroupType::MutuallyExclusive,
@@ -54,6 +57,7 @@ ControllerSelector::ControllerSelector(
 
 BT::NodeStatus ControllerSelector::tick()
 {
+  LOG_TRACE("BT plugin function entry: ControllerSelector::tick");
   callback_group_executor_.spin_some();
 
   // This behavior always use the last selected controller received from the topic input.
@@ -79,6 +83,7 @@ BT::NodeStatus ControllerSelector::tick()
 void
 ControllerSelector::callbackControllerSelect(const std_msgs::msg::String::SharedPtr msg)
 {
+  LOG_TRACE("BT plugin function entry: ControllerSelector::callbackControllerSelect");
   last_selected_controller_ = msg->data;
 }
 
@@ -87,5 +92,6 @@ ControllerSelector::callbackControllerSelect(const std_msgs::msg::String::Shared
 #include "behaviortree_cpp_v3/bt_factory.h"
 BT_REGISTER_NODES(factory)
 {
+  LOG_INFO("Registering BT plugin nodes from nav2_ws/src/navigation2/nav2_behavior_tree/plugins/action/controller_selector_node.cpp");
   factory.registerNodeType<nav2_behavior_tree::ControllerSelector>("ControllerSelector");
 }

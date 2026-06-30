@@ -17,6 +17,8 @@
 
 #include "nav2_behavior_tree/plugins/action/back_up_action.hpp"
 
+#include "spdlog_wrapper.hpp"
+
 namespace nav2_behavior_tree
 {
 
@@ -43,6 +45,7 @@ BackUpAction::BackUpAction(
 
 void BackUpAction::on_tick()
 {
+  LOG_TRACE("BT plugin function entry: BackUpAction::on_tick");
   increment_recovery_count();
 }
 
@@ -51,6 +54,7 @@ void BackUpAction::on_tick()
 #include "behaviortree_cpp_v3/bt_factory.h"
 BT_REGISTER_NODES(factory)
 {
+  LOG_INFO("Registering BT plugin nodes from nav2_ws/src/navigation2/nav2_behavior_tree/plugins/action/back_up_action.cpp");
   BT::NodeBuilder builder =
     [](const std::string & name, const BT::NodeConfiguration & config)
     {

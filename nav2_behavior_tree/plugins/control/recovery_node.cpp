@@ -15,6 +15,8 @@
 #include <string>
 #include "nav2_behavior_tree/plugins/control/recovery_node.hpp"
 
+#include "spdlog_wrapper.hpp"
+
 namespace nav2_behavior_tree
 {
 
@@ -26,11 +28,13 @@ RecoveryNode::RecoveryNode(
   number_of_retries_(1),
   retry_count_(0)
 {
+  LOG_TRACE("BT plugin function entry: RecoveryNode::RecoveryNode");
   getInput("number_of_retries", number_of_retries_);
 }
 
 BT::NodeStatus RecoveryNode::tick()
 {
+  LOG_TRACE("BT plugin function entry: RecoveryNode::tick");
   const unsigned children_count = children_nodes_.size();
 
   if (children_count != 2) {
@@ -115,6 +119,7 @@ BT::NodeStatus RecoveryNode::tick()
 
 void RecoveryNode::halt()
 {
+  LOG_TRACE("BT plugin function entry: RecoveryNode::halt");
   ControlNode::halt();
   retry_count_ = 0;
   current_child_idx_ = 0;
@@ -125,5 +130,6 @@ void RecoveryNode::halt()
 #include "behaviortree_cpp_v3/bt_factory.h"
 BT_REGISTER_NODES(factory)
 {
+  LOG_INFO("Registering BT plugin nodes from nav2_ws/src/navigation2/nav2_behavior_tree/plugins/control/recovery_node.cpp");
   factory.registerNodeType<nav2_behavior_tree::RecoveryNode>("RecoveryNode");
 }

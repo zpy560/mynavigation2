@@ -19,6 +19,8 @@
 
 #include "nav2_behavior_tree/plugins/decorator/path_longer_on_approach.hpp"
 
+#include "spdlog_wrapper.hpp"
+
 namespace nav2_behavior_tree
 {
 
@@ -27,6 +29,7 @@ PathLongerOnApproach::PathLongerOnApproach(
   const BT::NodeConfiguration & conf)
 : BT::DecoratorNode(name, conf)
 {
+  LOG_TRACE("BT plugin function entry: PathLongerOnApproach::PathLongerOnApproach");
   node_ = config().blackboard->get<rclcpp::Node::SharedPtr>("node");
 }
 
@@ -59,6 +62,7 @@ bool PathLongerOnApproach::isNewPathLonger(
 
 inline BT::NodeStatus PathLongerOnApproach::tick()
 {
+  LOG_TRACE("BT plugin function entry: PathLongerOnApproach::tick");
   getInput("path", new_path_);
   getInput("prox_len", prox_len_);
   getInput("length_factor", length_factor_);
@@ -102,5 +106,6 @@ inline BT::NodeStatus PathLongerOnApproach::tick()
 #include "behaviortree_cpp_v3/bt_factory.h"
 BT_REGISTER_NODES(factory)
 {
+  LOG_INFO("Registering BT plugin nodes from nav2_ws/src/navigation2/nav2_behavior_tree/plugins/decorator/path_longer_on_approach.cpp");
   factory.registerNodeType<nav2_behavior_tree::PathLongerOnApproach>("PathLongerOnApproach");
 }

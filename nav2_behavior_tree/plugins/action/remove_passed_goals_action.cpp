@@ -21,6 +21,8 @@
 
 #include "nav2_behavior_tree/plugins/action/remove_passed_goals_action.hpp"
 
+#include "spdlog_wrapper.hpp"
+
 namespace nav2_behavior_tree
 {
 
@@ -30,6 +32,7 @@ RemovePassedGoals::RemovePassedGoals(
 : BT::ActionNodeBase(name, conf),
   viapoint_achieved_radius_(0.5)
 {
+  LOG_TRACE("BT plugin function entry: RemovePassedGoals::RemovePassedGoals");
   getInput("radius", viapoint_achieved_radius_);
 
   getInput("global_frame", global_frame_);
@@ -41,6 +44,7 @@ RemovePassedGoals::RemovePassedGoals(
 
 inline BT::NodeStatus RemovePassedGoals::tick()
 {
+  LOG_TRACE("BT plugin function entry: RemovePassedGoals::tick");
   setStatus(BT::NodeStatus::RUNNING);
 
   Goals goal_poses;
@@ -58,6 +62,7 @@ inline BT::NodeStatus RemovePassedGoals::tick()
       current_pose, *tf_, global_frame_, robot_base_frame_,
       transform_tolerance_))
   {
+  LOG_TRACE("BT plugin function entry: nav2_util::getCurrentPose");
     return BT::NodeStatus::FAILURE;
   }
 
@@ -82,5 +87,6 @@ inline BT::NodeStatus RemovePassedGoals::tick()
 #include "behaviortree_cpp_v3/bt_factory.h"
 BT_REGISTER_NODES(factory)
 {
+  LOG_INFO("Registering BT plugin nodes from nav2_ws/src/navigation2/nav2_behavior_tree/plugins/action/remove_passed_goals_action.cpp");
   factory.registerNodeType<nav2_behavior_tree::RemovePassedGoals>("RemovePassedGoals");
 }

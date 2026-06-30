@@ -17,6 +17,8 @@
 
 #include "nav2_behavior_tree/plugins/action/follow_path_action.hpp"
 
+#include "spdlog_wrapper.hpp"
+
 namespace nav2_behavior_tree
 {
 
@@ -30,8 +32,15 @@ FollowPathAction::FollowPathAction(
 
 void FollowPathAction::on_tick()
 {
+  LOG_TRACE("BT plugin function entry: FollowPathAction::on_tick");
   getInput("path", goal_.path);
   getInput("controller_id", goal_.controller_id);
+  if (goal_.controller_id.empty()) {
+    if (!node_->has_parameter("selected_controller")) {
+      node_->declare_parameter("selected_controller", std::string("FollowPath"));
+    }
+    node_->get_parameter("selected_controller", goal_.controller_id);
+  }
   getInput("goal_checker_id", goal_.goal_checker_id);
 }
 
@@ -51,6 +60,12 @@ void FollowPathAction::on_wait_for_result(
 
   std::string new_controller_id;
   getInput("controller_id", new_controller_id);
+  if (new_controller_id.empty()) {
+    if (!node_->has_parameter("selected_controller")) {
+      node_->declare_parameter("selected_controller", std::string("FollowPath"));
+    }
+    node_->get_parameter("selected_controller", new_controller_id);
+  }
 
   if (goal_.controller_id != new_controller_id) {
     goal_.controller_id = new_controller_id;
@@ -71,6 +86,7 @@ void FollowPathAction::on_wait_for_result(
 #include "behaviortree_cpp_v3/bt_factory.h"
 BT_REGISTER_NODES(factory)
 {
+  LOG_INFO("Registering BT plugin nodes from nav2_ws/src/navigation2/nav2_behavior_tree/plugins/action/follow_path_action.cpp");
   BT::NodeBuilder builder =
     [](const std::string & name, const BT::NodeConfiguration & config)
     {

@@ -3,7 +3,7 @@ The Theta Star Planner is a global planning plugin meant to be used with the Nav
 
 See its [Configuration Guide Page](https://navigation.ros.org/configuration/packages/configuring-thetastar.html) for additional parameter descriptions.
 
-## Features 
+## Features
 - The planner uses A\* search along with line of sight (LOS) checks to form any-angle paths thus avoiding zig-zag paths that may be present in the usual implementation of A\*
 - As it also considers the costmap traversal cost during execution it tends to smoothen the paths automatically, thus mitigating the need to smoothen the path (The presence of sharp turns depends on the resolution of the map, and it decreases as the map resolution increases)
 - Uses the costs from the costmap to penalise high cost regions
@@ -48,7 +48,7 @@ w1*euc_cost(par, neigh) + w2*(costmap(par,neigh)/LETHAL_COST)^2`
 ## Parameters
 The parameters of the planner are :
 - ` .how_many_corners ` : to choose between 4-connected and 8-connected graph expansions, the accepted values are 4 and 8
-- ` .w_euc_cost ` : weight applied on the length of the path. 
+- ` .w_euc_cost ` : weight applied on the length of the path.
 - ` .w_traversal_cost ` : it tunes how harshly the nodes of high cost are penalised. From the above g(neigh) equation you can see that the cost-aware component of the cost function forms a parabolic curve, thus this parameter would, on increasing its value, make that curve steeper allowing for a greater differentiation (as the delta of costs would increase, when the graph becomes steep) among the nodes of different costs.
 Below are the default values of the parameters :
 ```
@@ -89,3 +89,75 @@ While smoother paths can be achieved by increasing the costmap resolution (ie us
 
 ### When to use this planner?
 This planner could be used in scenarios where planning speed matters over an extremely smooth path, which could anyways be handled by using a local planner/controller as mentioned above. Because of the any-angled nature of paths you can traverse environments diagonally (wherever it is allowed, eg: in a wide open region). Another use case would be when you have corridors that are misaligned in the map image, in such a case this planner would be able to give straight-line like paths as it considers line of sight and thus avoid giving jagged paths which arises with other planners because of the finite directions of motion they consider.
+
+
+# Nav2 Theta Star 规划器（中文翻译）
+
+## 概述
+Theta Star 规划器是一个用于 Nav2 Planner Server 的全局规划插件。`nav2_theta_star_planner` 实现了高度优化的 Theta* 规划器（具体为 Lazy Theta* P 变体），用于生成任意角度路径（any-angle），避免常规 A* 的之字形路径。该规划器支持差分驱动与全向机器人。
+
+参见配置指南：https://navigation.ros.org/configuration/packages/configuring-thetastar.html
+
+## 特性
+- 使用 A* 结合可视线（line of sight, LOS）检查生成任意角度路径，减少之字形路径。
+- 在计算时考虑代价地图遍历代价，有利于自动使路径更平滑。
+- 使用代价地图值惩罚高代价区域（更远离障碍）。
+- 可控制路径行为：更偏向任意角方向或更居中于空间。
+- 适合小型的全向或差分驱动机器人。
+- 算法与插件部分分离，便于重用。
+
+## 性能指标
+示例中，规划器平均用时约 46ms（示例路径 87.5m）。示例参数：`w_euc_cost: 1.0`, `w_traversal_cost: 5.0`，以及代价地图膨胀层 `cost_scaling_factor:5.0`, `inflation_radius: 5.5`。
+
+## 代价函数细节
+符号说明：
+- g(a)：节点 a 的已行成本
+- h(a)：启发代价
+- f(a)：总代价 f = g + h
+- curr：当前正在扩展邻居的节点
+- neigh：curr 的某个邻居节点
+- par：curr 的父节点
+- euc_cost(a,b)：a 与 b 的欧氏距离
+- costmap_cost(a,b)：a 与 b 之间的代价地图遍历代价（范围 0–252，255 表示未知）
+
+代价函数：
+- g(neigh) = g(curr) + w_euc_cost * euc_cost(curr, neigh)
+               + w_traversal_cost * (costmap_cost(curr,neigh)/LETHAL_COST)^2
+- h(neigh) = w_heuristic_cost * euc_cost(neigh, goal)
+- f(neigh) = g(neigh) + h(neigh)
+
+若 LOS 检查通过，g(neigh) 可能改为基于 par 的计算：g(par) + w1*euc_cost(par, neigh) + w2*(costmap(par,neigh)/LETHAL_COST)^2。
+
+## 参数说明（要点）
+- `.how_many_corners`：决定 4 连通或 8 连通扩展（可取 4 或 8）。
+- `.w_euc_cost`：路径长度项的权重（鼓励短路径）。
+- `.w_traversal_cost`：对高代价节点的惩罚强度（值越大，越倾向避开高代价区域）。
+示例默认：
+```
+planner_server:
+  ros__parameters:
+    planner_plugin_types: ["nav2_theta_star_planner/ThetaStarPlanner"]
+    use_sim_time: True
+    planner_plugin_ids: ["GridBased"]
+    GridBased:
+      how_many_corners: 8
+      w_euc_cost: 1.0
+      w_traversal_cost: 2.0
+```
+
+## 使用与调参建议
+- costmap_cost(curr,neigh) 在计算前归一化为 0..1。
+- 建议构建一个平缓的势场（gentle potential field），使大部分区域代价较低，仅在障碍附近有高代价，从而生成更居中的路径。可先设置膨胀层为 `cost_scaling_factor: 10.0`, `inflation_radius: 5.5`，然后根据需要降低 `cost_scaling_factor`。
+- 增大 `w_traversal_cost` 会使路径更远离障碍，但可能使路径不够紧凑（更长）、增加扩展数从而变慢。可同时调大 `w_euc_cost` 以增加路径紧凑度并抵消查询时间增加。
+- `w_heuristic_cost` 为内部设置，保持为 `min(w_euc_cost, 1.0)` 以确保启发与代价的一致性与可采性。
+- 在调参时也可调整全局代价地图的 `inflation_layer` 参数以获得期望行为。
+
+## 路径平滑
+- 由于代价函数特性，输出路径自然会在拐角处趋于平滑，但平滑程度受转弯宽度与地图栅格数量影响。
+- 建议配合局部规划器（如 DWB、TEB 或其他本地轨迹控制器）以处理可能的突变转角。
+- 增加代价地图分辨率（更细的栅格）可提升平滑性，但会增加查询时间，需权衡。
+
+## 适用场景
+- 适合在追求规划速度且能由本地规划器处理小幅不平滑路径的场景使用。
+- 任意角路径允许在开放空间进行对角穿越；在走廊错位或地图中轴线不对齐时表现良好。
+- 若需非常平滑且对路径质量要求极高，可配合路径平滑器或更高分辨率代价地图。

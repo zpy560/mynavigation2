@@ -18,6 +18,7 @@
 #include <memory>
 #include <limits>
 #include "nav2_bt_navigator/navigators/navigate_through_poses.hpp"
+#include "spdlog_wrapper.hpp"
 
 namespace nav2_bt_navigator
 {
@@ -43,6 +44,7 @@ NavigateThroughPosesNavigator::configure(
   path_blackboard_id_ = node->get_parameter("path_blackboard_id").as_string();
 
   // Odometry smoother object for getting current speed
+  // 中文：用于获取当前速度的里程计平滑器对象。
   odom_smoother_ = odom_smoother;
 
   return true;
@@ -99,7 +101,9 @@ NavigateThroughPosesNavigator::onLoop()
   using namespace nav2_util::geometry_utils;  // NOLINT
 
   // action server feedback (pose, duration of task,
+  // 中文：action server feedback，包括位姿、任务耗时、
   // number of recoveries, and distance remaining to goal, etc)
+  // 中文：恢复次数、到目标的剩余距离等。
   auto feedback_msg = std::make_shared<ActionT::Feedback>();
 
   auto blackboard = bt_action_server_->getBlackboard();
@@ -120,10 +124,12 @@ NavigateThroughPosesNavigator::onLoop()
 
   try {
     // Get current path points
+    // 中文：获取当前路径点。
     nav_msgs::msg::Path current_path;
     blackboard->get<nav_msgs::msg::Path>(path_blackboard_id_, current_path);
 
     // Find the closest pose to current pose on global path
+    // 中文：在全局路径上查找距离当前位姿最近的位姿。
     auto find_closest_pose_idx =
       [&current_pose, &current_path]() {
         size_t closest_pose_idx = 0;
@@ -140,18 +146,23 @@ NavigateThroughPosesNavigator::onLoop()
       };
 
     // Calculate distance on the path
+    // 中文：计算路径上的距离。
     double distance_remaining =
       nav2_util::geometry_utils::calculate_path_length(current_path, find_closest_pose_idx());
 
     // Default value for time remaining
+    // 中文：剩余时间默认值。
     rclcpp::Duration estimated_time_remaining = rclcpp::Duration::from_seconds(0.0);
 
     // Get current speed
+    // 中文：获取当前速度。
     geometry_msgs::msg::Twist current_odom = odom_smoother_->getTwist();
     double current_linear_speed = std::hypot(current_odom.linear.x, current_odom.linear.y);
 
     // Calculate estimated time taken to goal if speed is higher than 1cm/s
+    // 中文：如果速度高于 1cm/s，则估算到达目标所需时间。
     // and at least 10cm to go
+    // 中文：并且剩余距离至少为 10cm。
     if ((std::abs(current_linear_speed) > 0.01) && (distance_remaining > 0.1)) {
       estimated_time_remaining =
         rclcpp::Duration::from_seconds(distance_remaining / std::abs(current_linear_speed));
@@ -161,6 +172,7 @@ NavigateThroughPosesNavigator::onLoop()
     feedback_msg->estimated_time_remaining = estimated_time_remaining;
   } catch (...) {
     // Ignore
+    // 中文：忽略。
   }
 
   int recovery_count = 0;
@@ -176,15 +188,18 @@ NavigateThroughPosesNavigator::onLoop()
 void
 NavigateThroughPosesNavigator::onPreempt(ActionT::Goal::ConstSharedPtr goal)
 {
-  RCLCPP_INFO(logger_, "Received goal preemption request");
+  LOG_INFO("Received goal preemption request");
 
   if (goal->behavior_tree == bt_action_server_->getCurrentBTFilename() ||
     (goal->behavior_tree.empty() &&
     bt_action_server_->getCurrentBTFilename() == bt_action_server_->getDefaultBTFilename()))
   {
     // if pending goal requests the same BT as the current goal, accept the pending goal
+    // 中文：如果待处理目标请求的 BT 与当前目标相同，则接受该待处理目标。
     // if pending goal has an empty behavior_tree field, it requests the default BT file
+    // 中文：如果待处理目标的 behavior_tree 字段为空，则表示请求默认 BT 文件。
     // accept the pending goal if the current goal is running the default BT file
+    // 中文：如果当前目标正在运行默认 BT 文件，则接受待处理目标。
     initializeGoalPoses(bt_action_server_->acceptPendingGoal());
   } else {
     RCLCPP_WARN(
@@ -202,17 +217,17 @@ void
 NavigateThroughPosesNavigator::initializeGoalPoses(ActionT::Goal::ConstSharedPtr goal)
 {
   if (goal->poses.size() > 0) {
-    RCLCPP_INFO(
-      logger_, "Begin navigating from current location through %zu poses to (%.2f, %.2f)",
-      goal->poses.size(), goal->poses.back().pose.position.x, goal->poses.back().pose.position.y);
+    LOG_INFO("Begin navigating from current location through {} poses to ({:.2f}, {:.2f})", goal->poses.size(), goal->poses.back().pose.position.x, goal->poses.back().pose.position.y);
   }
 
   // Reset state for new action feedback
+  // 中文：为新的 action feedback 重置状态。
   start_time_ = clock_->now();
   auto blackboard = bt_action_server_->getBlackboard();
   blackboard->set<int>("number_recoveries", 0);  // NOLINT
 
   // Update the goal pose on the blackboard
+  // 中文：更新 blackboard 上的目标位姿。
   blackboard->set<Goals>(goals_blackboard_id_, goal->poses);
 }
 

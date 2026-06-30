@@ -35,7 +35,9 @@ namespace nav2_lifecycle_manager
 LifecycleManager::LifecycleManager(const rclcpp::NodeOptions & options)
 : Node("lifecycle_manager", options), diagnostics_updater_(this)
 {
-  RCLCPP_INFO(get_logger(), "Creating");
+  // SpdlogWrapper::init("nav2_lifecycle_manager", get_name());
+  LOG_INFO("Creating");
+  LOG_INFO("Creating lifecycle manager,get_name,{}", get_name());
 
   // The list of names is parameterized, allowing this module to be used with a different set
   // of nodes
@@ -111,7 +113,7 @@ LifecycleManager::LifecycleManager(const rclcpp::NodeOptions & options)
 
 LifecycleManager::~LifecycleManager()
 {
-  RCLCPP_INFO(get_logger(), "Destroying %s", get_name());
+  LOG_INFO("Destroying {}", get_name());
   service_thread_.reset();
 }
 
@@ -202,7 +204,7 @@ LifecycleManager::createBondConnection(const std::string & node_name)
         node_name.c_str(), timeout_s);
       return false;
     }
-    RCLCPP_INFO(get_logger(), "Server %s connected with bond.", node_name.c_str());
+    LOG_INFO("Server {} connected with bond.", node_name.c_str());
   }
 
   return true;
@@ -383,9 +385,7 @@ LifecycleManager::destroyBondTimer()
 void
 LifecycleManager::onRclPreshutdown()
 {
-  RCLCPP_INFO(
-    get_logger(), "Running Nav2 LifecycleManager rcl preshutdown (%s)",
-    this->get_name());
+  LOG_INFO("Running Nav2 LifecycleManager rcl preshutdown ({})", this->get_name());
 
   destroyBondTimer();
 
@@ -501,7 +501,7 @@ LifecycleManager::checkBondRespawnConnection()
 void
 LifecycleManager::message(const std::string & msg)
 {
-  RCLCPP_INFO(get_logger(), ANSI_COLOR_BLUE "\33[1m%s\33[0m" ANSI_COLOR_RESET, msg.c_str());
+  LOG_INFO(" LifecycleManager::message,{} ", msg.c_str());
 }
 
 }  // namespace nav2_lifecycle_manager

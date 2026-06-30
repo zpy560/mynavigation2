@@ -16,12 +16,15 @@
 
 #include "nav2_behavior_tree/plugins/control/round_robin_node.hpp"
 
+#include "spdlog_wrapper.hpp"
+
 namespace nav2_behavior_tree
 {
 
 RoundRobinNode::RoundRobinNode(const std::string & name)
 : BT::ControlNode::ControlNode(name, {})
 {
+  LOG_TRACE("BT plugin function entry: RoundRobinNode::RoundRobinNode");
 }
 
 RoundRobinNode::RoundRobinNode(
@@ -29,10 +32,12 @@ RoundRobinNode::RoundRobinNode(
   const BT::NodeConfiguration & config)
 : BT::ControlNode(name, config)
 {
+  LOG_TRACE("BT plugin function entry: RoundRobinNode::RoundRobinNode");
 }
 
 BT::NodeStatus RoundRobinNode::tick()
 {
+  LOG_TRACE("BT plugin function entry: RoundRobinNode::tick");
   const auto num_children = children_nodes_.size();
 
   setStatus(BT::NodeStatus::RUNNING);
@@ -80,6 +85,7 @@ BT::NodeStatus RoundRobinNode::tick()
 
 void RoundRobinNode::halt()
 {
+  LOG_TRACE("BT plugin function entry: RoundRobinNode::halt");
   ControlNode::halt();
   current_child_idx_ = 0;
   num_failed_children_ = 0;
@@ -89,5 +95,6 @@ void RoundRobinNode::halt()
 
 BT_REGISTER_NODES(factory)
 {
+  LOG_INFO("Registering BT plugin nodes from nav2_ws/src/navigation2/nav2_behavior_tree/plugins/control/round_robin_node.cpp");
   factory.registerNodeType<nav2_behavior_tree::RoundRobinNode>("RoundRobin");
 }

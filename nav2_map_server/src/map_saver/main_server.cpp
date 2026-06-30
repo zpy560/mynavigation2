@@ -24,9 +24,11 @@ int main(int argc, char ** argv)
 {
   rclcpp::init(argc, argv);
 
+  SpdlogWrapper::init("nav2_map_saver", "map_saver"); // 模块名 + 日志文件名
   auto logger = rclcpp::get_logger("map_saver_server");
   auto service_node = std::make_shared<nav2_map_server::MapSaver>();
   rclcpp::spin(service_node->get_node_base_interface());
   rclcpp::shutdown();
+  SpdlogWrapper::shutdown();
   return 0;
 }

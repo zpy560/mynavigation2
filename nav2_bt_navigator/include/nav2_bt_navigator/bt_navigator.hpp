@@ -27,6 +27,7 @@
 #include "tf2_ros/create_timer_ros.h"
 #include "nav2_bt_navigator/navigators/navigate_to_pose.hpp"
 #include "nav2_bt_navigator/navigators/navigate_through_poses.hpp"
+#include "spdlog_wrapper.hpp"
 
 namespace nav2_bt_navigator
 {
@@ -34,72 +35,98 @@ namespace nav2_bt_navigator
 /**
  * @class nav2_bt_navigator::BtNavigator
  * @brief An action server that uses behavior tree for navigating a robot to its
+  * 中文：使用行为树将机器人导航到
  * goal position.
+  * 中文：目标位置的 action server。
  */
 class BtNavigator : public nav2_util::LifecycleNode
 {
 public:
   /**
    * @brief A constructor for nav2_bt_navigator::BtNavigator class
+   * 中文：nav2_bt_navigator::BtNavigator 类的构造函数。
    * @param options Additional options to control creation of the node.
+   * 中文：用于控制节点创建的附加选项。
    */
   explicit BtNavigator(rclcpp::NodeOptions options = rclcpp::NodeOptions());
   /**
    * @brief A destructor for nav2_bt_navigator::BtNavigator class
+   * 中文：nav2_bt_navigator::BtNavigator 类的析构函数。
    */
   ~BtNavigator();
 
 protected:
   /**
    * @brief Configures member variables
+   * 中文：配置成员变量。
    *
    * Initializes action server for "NavigationToPose"; subscription to
+   * 中文：初始化 "NavigationToPose" action server；订阅
    * "goal_sub"; and builds behavior tree from xml file.
+   * 中文："goal_sub"；并从 XML 文件构建行为树。
    * @param state Reference to LifeCycle node state
+   * 中文：Lifecycle 节点状态引用。
    * @return SUCCESS or FAILURE
+   * 中文：SUCCESS 或 FAILURE。
    */
   nav2_util::CallbackReturn on_configure(const rclcpp_lifecycle::State & state) override;
   /**
    * @brief Activates action server
+   * 中文：激活 action server。
    * @param state Reference to LifeCycle node state
+   * 中文：Lifecycle 节点状态引用。
    * @return SUCCESS or FAILURE
+   * 中文：SUCCESS 或 FAILURE。
    */
   nav2_util::CallbackReturn on_activate(const rclcpp_lifecycle::State & state) override;
   /**
    * @brief Deactivates action server
+   * 中文：停用 action server。
    * @param state Reference to LifeCycle node state
+   * 中文：Lifecycle 节点状态引用。
    * @return SUCCESS or FAILURE
+   * 中文：SUCCESS 或 FAILURE。
    */
   nav2_util::CallbackReturn on_deactivate(const rclcpp_lifecycle::State & state) override;
   /**
    * @brief Resets member variables
+   * 中文：重置成员变量。
    * @param state Reference to LifeCycle node state
+   * 中文：Lifecycle 节点状态引用。
    * @return SUCCESS or FAILURE
+   * 中文：SUCCESS 或 FAILURE。
    */
   nav2_util::CallbackReturn on_cleanup(const rclcpp_lifecycle::State & state) override;
   /**
    * @brief Called when in shutdown state
+   * 中文：进入 shutdown 状态时调用。
    * @param state Reference to LifeCycle node state
+   * 中文：Lifecycle 节点状态引用。
    * @return SUCCESS or FAILURE
+   * 中文：SUCCESS 或 FAILURE。
    */
   nav2_util::CallbackReturn on_shutdown(const rclcpp_lifecycle::State & state) override;
 
   // To handle all the BT related execution
+  // 中文：处理所有与 BT 相关的执行逻辑。
   std::unique_ptr<nav2_bt_navigator::Navigator<nav2_msgs::action::NavigateToPose>> pose_navigator_;
   std::unique_ptr<nav2_bt_navigator::Navigator<nav2_msgs::action::NavigateThroughPoses>>
   poses_navigator_;
   nav2_bt_navigator::NavigatorMuxer plugin_muxer_;
 
   // Odometry smoother object
+  // 中文：里程计平滑器对象。
   std::shared_ptr<nav2_util::OdomSmoother> odom_smoother_;
 
   // Metrics for feedback
+  // 中文：用于 feedback 的度量信息。
   std::string robot_frame_;
   std::string global_frame_;
   double transform_tolerance_;
   std::string odom_topic_;
 
   // Spinning transform that can be used by the BT nodes
+  // 中文：供 BT 节点使用的持续运行 TF。
   std::shared_ptr<tf2_ros::Buffer> tf_;
   std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
 };

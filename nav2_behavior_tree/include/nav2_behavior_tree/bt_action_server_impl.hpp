@@ -26,6 +26,7 @@
 #include "nav2_behavior_tree/bt_action_server.hpp"
 #include "ament_index_cpp/get_package_share_directory.hpp"
 #include "nav2_util/node_utils.hpp"
+#include "spdlog_wrapper.hpp"
 
 namespace nav2_behavior_tree
 {
@@ -49,6 +50,10 @@ BtActionServer<ActionT>::BtActionServer(
   on_preempt_callback_(on_preempt_callback),
   on_completion_callback_(on_completion_callback)
 {
+  LOG_INFO(
+    "BtActionServer constructor entry: action_name={}, default_bt_xml={}, plugin_count={}",
+    action_name_.c_str(), default_bt_xml_filename_.c_str(), plugin_lib_names_.size());
+
   auto node = node_.lock();
   logger_ = node->get_logger();
   clock_ = node->get_clock();
@@ -66,6 +71,8 @@ BtActionServer<ActionT>::BtActionServer(
   if (!node->has_parameter("wait_for_service_timeout")) {
     node->declare_parameter("wait_for_service_timeout", 1000);
   }
+
+  LOG_INFO("BtActionServer constructor exit: action_name={}", action_name_.c_str());
 }
 
 template<class ActionT>
@@ -75,8 +82,11 @@ BtActionServer<ActionT>::~BtActionServer()
 template<class ActionT>
 bool BtActionServer<ActionT>::on_configure()
 {
+  LOG_INFO("BtActionServer on_configure entry: action_name={}", action_name_.c_str());
+
   auto node = node_.lock();
   if (!node) {
+    LOG_INFO("BtActionServer on_configure failed: action_name={}, node lock failed", action_name_.c_str());
     throw std::runtime_error{"Failed to lock node"};
   }
 
@@ -123,6 +133,14 @@ bool BtActionServer<ActionT>::on_configure()
   wait_for_service_timeout_ = std::chrono::milliseconds(wait_for_service_timeout);
   node->get_parameter("always_reload_bt_xml", always_reload_bt_xml_);
 
+  LOG_INFO(
+    "BtActionServer on_configure params: action_name={}, bt_loop_duration_ms={}, "
+    "default_server_timeout_ms={}, wait_for_service_timeout_ms={}, always_reload_bt_xml={}, "
+    "plugin_count={}, client_node={}",
+    action_name_.c_str(), bt_loop_duration_.count(), default_server_timeout_.count(),
+    wait_for_service_timeout_.count(), always_reload_bt_xml_, plugin_lib_names_.size(),
+    client_node_->get_name());
+
   // Create the class that registers our custom nodes and executes the BT
   bt_ = std::make_unique<nav2_behavior_tree::BehaviorTreeEngine>(plugin_lib_names_);
 
@@ -137,30 +155,47 @@ bool BtActionServer<ActionT>::on_configure()
     "wait_for_service_timeout",
     wait_for_service_timeout_);
 
+  LOG_INFO("BtActionServer on_configure exit: action_name={}", action_name_.c_str());
   return true;
 }
 
 template<class ActionT>
 bool BtActionServer<ActionT>::on_activate()
 {
+  LOG_INFO(
+    "BtActionServer on_activate entry: action_name={}, default_bt_xml={}",
+    action_name_.c_str(), default_bt_xml_filename_.c_str());
+
   if (!loadBehaviorTree(default_bt_xml_filename_)) {
+    LOG_INFO(
+      "BtActionServer on_activate failed: action_name={}, default_bt_xml={}",
+      action_name_.c_str(), default_bt_xml_filename_.c_str());
     RCLCPP_ERROR(logger_, "Error loading XML file: %s", default_bt_xml_filename_.c_str());
     return false;
   }
   action_server_->activate();
+  LOG_INFO(
+    "BtActionServer on_activate exit: action_name={}, loaded_bt_xml={}",
+    action_name_.c_str(), current_bt_xml_filename_.c_str());
   return true;
 }
 
 template<class ActionT>
 bool BtActionServer<ActionT>::on_deactivate()
 {
+  LOG_INFO("BtActionServer on_deactivate entry: action_name={}", action_name_.c_str());
   action_server_->deactivate();
+  LOG_INFO("BtActionServer on_deactivate exit: action_name={}", action_name_.c_str());
   return true;
 }
 
 template<class ActionT>
 bool BtActionServer<ActionT>::on_cleanup()
 {
+  LOG_INFO(
+    "BtActionServer on_cleanup entry: action_name={}, current_bt_xml={}",
+    action_name_.c_str(), current_bt_xml_filename_.c_str());
+
   client_node_.reset();
   action_server_.reset();
   topic_logger_.reset();
@@ -169,6 +204,8 @@ bool BtActionServer<ActionT>::on_cleanup()
   blackboard_.reset();
   bt_->haltAllActions(tree_.rootNode());
   bt_.reset();
+
+  LOG_INFO("BtActionServer on_cleanup exit: action_name={}", action_name_.c_str());
   return true;
 }
 
@@ -178,8 +215,17 @@ bool BtActionServer<ActionT>::loadBehaviorTree(const std::string & bt_xml_filena
   // Empty filename is default for backward compatibility
   auto filename = bt_xml_filename.empty() ? default_bt_xml_filename_ : bt_xml_filename;
 
+  LOG_INFO(
+    "BtActionServer loadBehaviorTree entry: action_name={}, requested_bt_xml={}, "
+    "resolved_bt_xml={}, current_bt_xml={}, always_reload_bt_xml={}",
+    action_name_.c_str(), bt_xml_filename.c_str(), filename.c_str(),
+    current_bt_xml_filename_.c_str(), always_reload_bt_xml_);
+
   // Use previous BT if it is the existing one and always reload flag is not set to true
   if (!always_reload_bt_xml_ && current_bt_xml_filename_ == filename) {
+    LOG_INFO(
+      "BtActionServer loadBehaviorTree reused current tree: action_name={}, bt_xml={}",
+      action_name_.c_str(), filename.c_str());
     RCLCPP_DEBUG(logger_, "BT will not be reloaded as the given xml is already loaded");
     return true;
   }
@@ -188,6 +234,9 @@ bool BtActionServer<ActionT>::loadBehaviorTree(const std::string & bt_xml_filena
   std::ifstream xml_file(filename);
 
   if (!xml_file.good()) {
+    LOG_INFO(
+      "BtActionServer loadBehaviorTree failed to open file: action_name={}, bt_xml={}",
+      action_name_.c_str(), filename.c_str());
     RCLCPP_ERROR(logger_, "Couldn't open input XML file: %s", filename.c_str());
     return false;
   }
@@ -208,6 +257,9 @@ bool BtActionServer<ActionT>::loadBehaviorTree(const std::string & bt_xml_filena
         wait_for_service_timeout_);
     }
   } catch (const std::exception & e) {
+    LOG_INFO(
+      "BtActionServer loadBehaviorTree exception: action_name={}, bt_xml={}, error={}",
+      action_name_.c_str(), filename.c_str(), e.what());
     RCLCPP_ERROR(logger_, "Exception when loading BT: %s", e.what());
     return false;
   }
@@ -215,16 +267,28 @@ bool BtActionServer<ActionT>::loadBehaviorTree(const std::string & bt_xml_filena
   topic_logger_ = std::make_unique<RosTopicLogger>(client_node_, tree_);
 
   current_bt_xml_filename_ = filename;
+  LOG_INFO(
+    "BtActionServer loadBehaviorTree exit: action_name={}, bt_xml={}, xml_size_bytes={}, "
+    "blackboard_stack_size={}",
+    action_name_.c_str(), current_bt_xml_filename_.c_str(), xml_string.size(),
+    tree_.blackboard_stack.size());
   return true;
 }
 
 template<class ActionT>
 void BtActionServer<ActionT>::executeCallback()
 {
+  LOG_INFO(
+    "BtActionServer executeCallback entry: action_name={}, current_bt_xml={}",
+    action_name_.c_str(), current_bt_xml_filename_.c_str());
+
   if (!on_goal_received_callback_(action_server_->get_current_goal())) {
+    LOG_INFO("BtActionServer executeCallback rejected goal: action_name={}", action_name_.c_str());
     action_server_->terminate_current();
     return;
   }
+
+  LOG_INFO("BtActionServer executeCallback accepted goal: action_name={}", action_name_.c_str());
 
   auto is_canceling = [&]() {
       if (action_server_ == nullptr) {
@@ -249,9 +313,14 @@ void BtActionServer<ActionT>::executeCallback()
   // Execute the BT that was previously created in the configure step
   nav2_behavior_tree::BtStatus rc = bt_->run(&tree_, on_loop, is_canceling, bt_loop_duration_);
 
+  LOG_INFO(
+    "BtActionServer executeCallback behavior tree finished: action_name={}, status={}",
+    action_name_.c_str(), static_cast<int>(rc));
+
   // Make sure that the Bt is not in a running state from a previous execution
   // note: if all the ControlNodes are implemented correctly, this is not needed.
   bt_->haltAllActions(tree_.rootNode());
+  LOG_INFO("BtActionServer executeCallback halted actions: action_name={}", action_name_.c_str());
 
   // Give server an opportunity to populate the result message or simple give
   // an indication that the action is complete.
@@ -261,16 +330,19 @@ void BtActionServer<ActionT>::executeCallback()
   switch (rc) {
     case nav2_behavior_tree::BtStatus::SUCCEEDED:
       action_server_->succeeded_current(result);
+      LOG_INFO("BtActionServer executeCallback exit: action_name={}, result=SUCCEEDED", action_name_.c_str());
       RCLCPP_INFO(logger_, "Goal succeeded");
       break;
 
     case nav2_behavior_tree::BtStatus::FAILED:
       action_server_->terminate_current(result);
+      LOG_INFO("BtActionServer executeCallback exit: action_name={}, result=FAILED", action_name_.c_str());
       RCLCPP_ERROR(logger_, "Goal failed");
       break;
 
     case nav2_behavior_tree::BtStatus::CANCELED:
       action_server_->terminate_all(result);
+      LOG_INFO("BtActionServer executeCallback exit: action_name={}, result=CANCELED", action_name_.c_str());
       RCLCPP_INFO(logger_, "Goal canceled");
       break;
   }

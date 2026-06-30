@@ -25,7 +25,7 @@
           </RecoveryNode>
         </RateController>
         <RecoveryNode number_of_retries="1" name="FollowPath">
-          <FollowPath path="{path}" controller_id="FollowPath"/>
+          <FollowPath path="{path}" controller_id=""/>
           <ClearEntireCostmap name="ClearLocalCostmap-Context" service_name="local_costmap/clear_entirely_local_costmap"/>
         </RecoveryNode>
       </PipelineSequence>
@@ -44,3 +44,17 @@
     </RecoveryNode>
   </BehaviorTree>
 </root>
+
+<!--
+中文说明：
+1. 这棵树用于“稳定重规划”：不是固定每次都规划，而是在路径过期、目标更新或路径失效时重算。
+2. RateController 以 2Hz 检查规划分支；Fallback 的第一个分支用于判断是否可以继续复用现有 {path}。
+3. ReactiveSequence 中三个条件同时成立时，表示暂不需要新路径：
+   - PathExpiringTimer 经过 Inverter 后要求路径未超过 seconds=10 的有效窗口；
+   - GlobalUpdatedGoal 经过 Inverter 后要求全局目标没有更新；
+   - IsPathValid 要求当前 {path} 仍可用。
+4. 如果上述检查失败，Fallback 才执行 ComputePathToPose，读取 {goal} 并更新 blackboard["path"]。
+5. FollowPath 持续跟踪当前 {path}；若重规划生成新路径，FollowPath action 节点会在运行中更新 goal。
+6. 规划失败清理 global_costmap，控制失败清理 local_costmap；顶层 NavigateRecovery 再提供
+   清理、旋转、等待、后退的系统级恢复。
+-->

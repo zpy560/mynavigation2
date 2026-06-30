@@ -8,7 +8,17 @@
       <DistanceController distance="1.0">
         <ComputePathToPose goal="{goal}" path="{path}" planner_id="GridBased"/>
       </DistanceController>
-      <FollowPath path="{path}"  controller_id="FollowPath"/>
+      <FollowPath path="{path}"  controller_id=""/>
     </PipelineSequence>
   </BehaviorTree>
 </root>
+
+<!--
+中文说明：
+1. 这是按行驶距离触发重规划的最小导航树，不包含恢复逻辑。
+2. DistanceController distance=1.0 会在机器人累计移动约 1 米后 tick 一次 ComputePathToPose。
+3. ComputePathToPose 使用当前 {goal} 重新计算全局路径，并把结果写入 blackboard["path"]。
+4. PipelineSequence 让 FollowPath 持续跟踪当前路径；当 {path} 更新时，FollowPath 会向
+   controller_server 发送新的 /follow_path goal。
+5. 该策略适合环境变化不快、希望降低全局规划频率的场景；失败时不会自动清理代价地图或执行恢复。
+-->

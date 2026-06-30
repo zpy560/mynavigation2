@@ -298,3 +298,172 @@
 
   </TreeNodesModel>
 </root>
+
+<!--
+中文注释：Nav2 BehaviorTree 节点 ID 作用说明
+
+这个文件是 Groot 的节点模型描述文件，用来告诉 Groot 每个 BehaviorTree 节点的 ID、类型和端口。
+它本身不执行导航逻辑；运行时真正的 C++ 插件由 bt_navigator 通过 plugin_lib_names 注册。
+XML 行为树中写到的标签名，例如 <ComputePathToPose>，会与这里的 ID 对应。
+
+Action 节点
+
+BackUp：
+调用 backup 行为，让机器人按给定距离和速度后退，常用于恢复动作。
+
+DriveOnHeading：
+调用 drive_on_heading 行为，让机器人沿当前或指定朝向直线行驶一段距离。
+
+CancelControl：
+取消 controller_server 正在执行的 FollowPath 控制 action。
+
+CancelBackUp：
+取消正在执行的 BackUp 后退恢复行为。
+
+CancelDriveOnHeading：
+取消正在执行的 DriveOnHeading 直行行为。
+
+CancelSpin：
+取消正在执行的 Spin 原地旋转行为。
+
+CancelAssistedTeleop：
+取消正在执行的 AssistedTeleop 辅助遥控行为。
+
+CancelWait：
+取消正在执行的 Wait 等待行为。
+
+ClearEntireCostmap：
+调用 costmap 清理服务，清空指定 costmap 的全部代价值。
+
+ClearCostmapExceptRegion：
+清理指定 costmap，但保留机器人附近一定区域内的代价值。
+
+ClearCostmapAroundRobot：
+清理机器人周围一定半径内的 costmap 代价值。
+
+ComputePathToPose：
+调用 planner_server 的 ComputePathToPose action，为单个目标点规划全局路径，并把结果写入 path。
+
+ComputePathThroughPoses：
+调用 planner_server 的 ComputePathThroughPoses action，为多个途经点规划一条全局路径，并把结果写入 path。
+
+RemovePassedGoals：
+从多目标 goals 列表中移除机器人已经经过的目标点，输出剩余目标点。
+
+SmoothPath：
+调用 smoother_server 对输入路径做平滑处理，输出平滑后的路径、耗时以及是否完整完成。
+
+FollowPath：
+调用 controller_server 的 FollowPath action，按输入 path 执行局部控制跟踪。
+
+NavigateToPose：
+作为 BT 内部的导航 action 节点，向 navigate_to_pose action server 发送单目标导航请求，可指定子行为树。
+
+NavigateThroughPoses：
+作为 BT 内部的导航 action 节点，向 navigate_through_poses action server 发送多目标导航请求，可指定子行为树。
+
+ReinitializeGlobalLocalization：
+调用全局重定位服务，通常用于 AMCL 重新初始化粒子分布。
+
+TruncatePath：
+按距离从全局路径末端截断一段路径，常用于只把接近目标前的一段路径交给后续节点。
+
+TruncatePathLocal：
+围绕机器人当前位置截取局部路径片段，可同时限制前向和后向距离，用于局部控制或近场判断。
+
+PlannerSelector：
+监听 planner 选择话题，输出当前要使用的 planner_id；没有外部选择时使用默认 planner。
+
+ControllerSelector：
+监听 controller 选择话题，输出当前要使用的 controller_id；没有外部选择时使用默认 controller。
+
+SmootherSelector：
+监听 smoother 选择话题，输出当前要使用的 smoother_id；没有外部选择时使用默认 smoother。
+
+GoalCheckerSelector：
+监听 goal_checker 选择话题，输出当前要使用的 goal_checker_id；没有外部选择时使用默认 goal checker。
+
+ProgressCheckerSelector：
+监听 progress_checker 选择话题，输出当前要使用的 progress_checker_id；没有外部选择时使用默认 progress checker。
+
+Spin：
+调用 spin 行为，让机器人原地旋转指定角度，常用于恢复动作。
+
+Wait：
+调用 wait 行为，让机器人保持等待指定时间，常用于恢复动作或节流流程。
+
+AssistedTeleop：
+调用 assisted_teleop 行为，在限定时间内进入辅助遥控模式，可作为人工接管式恢复动作。
+
+Condition 节点
+
+GoalReached：
+判断机器人是否已经到达给定目标点。
+
+IsStuck：
+根据运动状态判断机器人是否卡住。
+
+TransformAvailable：
+检查 parent frame 和 child frame 之间的 TF 是否可用。
+
+GoalUpdated：
+判断当前导航目标是否被更新。
+
+GlobalUpdatedGoal：
+判断全局目标是否被更新，常用于全局层面的目标更新触发。
+
+IsBatteryLow：
+根据电池话题判断电量或电压是否低于阈值。
+
+IsBatteryCharging：
+根据电池话题判断机器人是否处于充电状态。
+
+DistanceTraveled：
+判断机器人从某个参考点开始累计移动距离是否超过阈值。
+
+TimeExpired：
+判断指定时间是否已经超时。
+
+PathExpiringTimer：
+判断路径是否超过有效时间；当 path 更新时会重置计时。
+
+InitialPoseReceived：
+判断是否已经收到初始位姿，常用于定位初始化流程。
+
+IsPathValid：
+调用路径有效性检查服务，判断当前 path 是否仍然可通行。
+
+Control 节点
+
+PipelineSequence：
+流水线顺序节点。按顺序 tick 子节点，并允许前面的规划类节点在后面的控制类节点运行时继续周期性刷新。
+
+RecoveryNode：
+恢复控制节点。主任务失败时执行恢复子节点，并按 number_of_retries 限制重试次数。
+
+RoundRobin：
+轮询控制节点。每次失败后切换到下一个子节点，常用于在多种恢复动作之间轮流尝试。
+
+Decorator 节点
+
+RateController：
+按 hz 限制子节点 tick 频率，常用于控制重新规划频率。
+
+DistanceController：
+只有当机器人移动距离超过阈值时才 tick 子节点，常用于按行驶距离触发重新规划。
+
+SingleTrigger：
+只允许子节点成功触发一次，后续 tick 不再重复执行同一动作。
+
+GoalUpdater：
+监听目标更新，把原始目标 input_goal 更新为 output_goal，用于导航过程中动态改目标。
+
+SpeedController：
+根据机器人速度在 min_rate 和 max_rate 之间调节子节点 tick 频率。
+
+PathLongerOnApproach：
+当机器人接近目标时，检查新路径是否比原路径显著变长，用于避免接近目标阶段反复采用绕远路径。
+
+GoalUpdatedController：
+当目标更新时触发子节点，常用于目标变化后重新规划或打断当前流程。
+-->

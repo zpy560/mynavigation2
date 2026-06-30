@@ -31,6 +31,11 @@ BehaviorServer::BehaviorServer(const rclcpp::NodeOptions & options)
     "nav2_behaviors/DriveOnHeading",
     "nav2_behaviors/Wait"}
 {
+  LOG_INFO("Creating behavior server");
+  LOG_INFO("Behavior server will load recovery/action plugins and monitor local costmap collisions");
+
+  // 中文注释：BehaviorServer 承接行为树中的恢复/辅助动作，例如 Spin、BackUp、
+  // DriveOnHeading、Wait；具体行为通过 behavior_plugins 参数加载。
   declare_parameter(
     "costmap_topic",
     rclcpp::ParameterValue(std::string("local_costmap/costmap_raw")));
@@ -67,8 +72,11 @@ BehaviorServer::~BehaviorServer()
 nav2_util::CallbackReturn
 BehaviorServer::on_configure(const rclcpp_lifecycle::State & /*state*/)
 {
-  RCLCPP_INFO(get_logger(), "Configuring");
+  LOG_INFO("Configuring");
+  LOG_INFO("Configuring behavior plugins and collision checker");
 
+  // 中文注释：恢复行为通常依赖局部代价地图和机器人 footprint 判断是否安全；
+  // 这里先建立 TF、costmap 和 footprint 订阅，再把 collision_checker 交给每个plugin
   tf_ = std::make_shared<tf2_ros::Buffer>(get_clock());
   auto timer_interface = std::make_shared<tf2_ros::CreateTimerROS>(
     get_node_base_interface(),
@@ -82,6 +90,9 @@ BehaviorServer::on_configure(const rclcpp_lifecycle::State & /*state*/)
   this->get_parameter("footprint_topic", footprint_topic);
   this->get_parameter("transform_tolerance", transform_tolerance);
   this->get_parameter("robot_base_frame", robot_base_frame);
+  LOG_INFO(
+    "Behavior server inputs costmap_topic={}, footprint_topic={}, robot_base_frame={}, transform_tolerance={}",
+    costmap_topic.c_str(), footprint_topic.c_str(), robot_base_frame.c_str(), transform_tolerance);
   costmap_sub_ = std::make_unique<nav2_costmap_2d::CostmapSubscriber>(
     shared_from_this(), costmap_topic);
   footprint_sub_ = std::make_unique<nav2_costmap_2d::FootprintSubscriber>(
@@ -107,9 +118,9 @@ BehaviorServer::loadBehaviorPlugins()
   for (size_t i = 0; i != behavior_ids_.size(); i++) {
     behavior_types_[i] = nav2_util::get_plugin_type_param(node, behavior_ids_[i]);
     try {
-      RCLCPP_INFO(
-        get_logger(), "Creating behavior plugin %s of type %s",
-        behavior_ids_[i].c_str(), behavior_types_[i].c_str());
+      LOG_INFO("Creating behavior plugin {} of type {}", behavior_ids_[i].c_str(), behavior_types_[i].c_str());
+      // 中文注释：每个插件内部会创建自己的 action server；
+      // BT Navigator 通过行为树节点调用这些 action 完成恢复动作。
       behaviors_.push_back(plugin_loader_.createUniqueInstance(behavior_types_[i]));
       behaviors_.back()->configure(node, behavior_ids_[i], tf_, collision_checker_);
     } catch (const pluginlib::PluginlibException & ex) {
@@ -127,13 +138,16 @@ BehaviorServer::loadBehaviorPlugins()
 nav2_util::CallbackReturn
 BehaviorServer::on_activate(const rclcpp_lifecycle::State & /*state*/)
 {
-  RCLCPP_INFO(get_logger(), "Activating");
+  LOG_INFO("Activating");
+  LOG_INFO("Activating behavior plugins");
+  LOG_INFO("Activating {} behavior plugins", behaviors_.size());
   std::vector<pluginlib::UniquePtr<nav2_core::Behavior>>::iterator iter;
   for (iter = behaviors_.begin(); iter != behaviors_.end(); ++iter) {
     (*iter)->activate();
   }
 
   // create bond connection
+  // 中文：创建 bond 连接。
   createBond();
 
   return nav2_util::CallbackReturn::SUCCESS;
@@ -142,7 +156,7 @@ BehaviorServer::on_activate(const rclcpp_lifecycle::State & /*state*/)
 nav2_util::CallbackReturn
 BehaviorServer::on_deactivate(const rclcpp_lifecycle::State & /*state*/)
 {
-  RCLCPP_INFO(get_logger(), "Deactivating");
+  LOG_INFO("Deactivating");
 
   std::vector<pluginlib::UniquePtr<nav2_core::Behavior>>::iterator iter;
   for (iter = behaviors_.begin(); iter != behaviors_.end(); ++iter) {
@@ -150,6 +164,7 @@ BehaviorServer::on_deactivate(const rclcpp_lifecycle::State & /*state*/)
   }
 
   // destroy bond connection
+  // 中文：销毁 bond 连接。
   destroyBond();
 
   return nav2_util::CallbackReturn::SUCCESS;
@@ -158,7 +173,7 @@ BehaviorServer::on_deactivate(const rclcpp_lifecycle::State & /*state*/)
 nav2_util::CallbackReturn
 BehaviorServer::on_cleanup(const rclcpp_lifecycle::State & /*state*/)
 {
-  RCLCPP_INFO(get_logger(), "Cleaning up");
+  LOG_INFO("Cleaning up");
 
   std::vector<pluginlib::UniquePtr<nav2_core::Behavior>>::iterator iter;
   for (iter = behaviors_.begin(); iter != behaviors_.end(); ++iter) {
@@ -178,7 +193,7 @@ BehaviorServer::on_cleanup(const rclcpp_lifecycle::State & /*state*/)
 nav2_util::CallbackReturn
 BehaviorServer::on_shutdown(const rclcpp_lifecycle::State &)
 {
-  RCLCPP_INFO(get_logger(), "Shutting down");
+  LOG_INFO("Shutting down");
   return nav2_util::CallbackReturn::SUCCESS;
 }
 
@@ -187,6 +202,9 @@ BehaviorServer::on_shutdown(const rclcpp_lifecycle::State &)
 #include "rclcpp_components/register_node_macro.hpp"
 
 // Register the component with class_loader.
+// 中文：将组件注册到 class_loader。
 // This acts as a sort of entry point, allowing the component to be discoverable when its library
+// 中文：这相当于组件入口，使组件所在库被加载时可以被发现。
 // is being loaded into a running process.
+// 中文：当组件库被加载到运行中的进程时可被发现。
 RCLCPP_COMPONENTS_REGISTER_NODE(behavior_server::BehaviorServer)

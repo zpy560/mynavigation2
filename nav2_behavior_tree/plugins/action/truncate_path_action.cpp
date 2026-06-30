@@ -24,6 +24,8 @@
 
 #include "nav2_behavior_tree/plugins/action/truncate_path_action.hpp"
 
+#include "spdlog_wrapper.hpp"
+
 namespace nav2_behavior_tree
 {
 
@@ -33,11 +35,13 @@ TruncatePath::TruncatePath(
 : BT::ActionNodeBase(name, conf),
   distance_(1.0)
 {
+  LOG_TRACE("BT plugin function entry: TruncatePath::TruncatePath");
   getInput("distance", distance_);
 }
 
 inline BT::NodeStatus TruncatePath::tick()
 {
+  LOG_TRACE("BT plugin function entry: TruncatePath::tick");
   setStatus(BT::NodeStatus::RUNNING);
 
   nav_msgs::msg::Path input_path;
@@ -85,5 +89,6 @@ inline BT::NodeStatus TruncatePath::tick()
 #include "behaviortree_cpp_v3/bt_factory.h"
 BT_REGISTER_NODES(factory)
 {
+  LOG_INFO("Registering BT plugin nodes from nav2_ws/src/navigation2/nav2_behavior_tree/plugins/action/truncate_path_action.cpp");
   factory.registerNodeType<nav2_behavior_tree::TruncatePath>("TruncatePath");
 }

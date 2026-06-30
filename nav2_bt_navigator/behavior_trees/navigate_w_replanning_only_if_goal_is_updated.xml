@@ -8,7 +8,17 @@
       <GoalUpdatedController>
         <ComputePathToPose goal="{goal}" path="{path}" planner_id="GridBased"/>
       </GoalUpdatedController>
-      <FollowPath path="{path}"  controller_id="FollowPath"/>
+      <FollowPath path="{path}"  controller_id=""/>
     </PipelineSequence>
   </BehaviorTree>
 </root>
+
+<!--
+中文说明：
+1. 这棵树只在导航目标更新时重新规划，不根据时间、距离或路径有效性主动重规划。
+2. GoalUpdatedController 作为装饰节点，只有检测到 blackboard 中的 {goal} 发生更新时，才 tick
+   ComputePathToPose。
+3. ComputePathToPose 读取最新 {goal}，调用 /compute_path_to_pose 生成全局路径，并写入 {path}。
+4. FollowPath 持续读取 {path} 并调用 /follow_path 跟踪；如果目标不变，控制器会沿已有路径继续走。
+5. 该树没有 RecoveryNode 和 ClearCostmap，适合验证目标更新触发逻辑；规划或控制失败会直接让任务失败。
+-->

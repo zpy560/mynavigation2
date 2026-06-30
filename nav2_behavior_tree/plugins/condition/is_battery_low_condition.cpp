@@ -17,6 +17,8 @@
 
 #include "nav2_behavior_tree/plugins/condition/is_battery_low_condition.hpp"
 
+#include "spdlog_wrapper.hpp"
+
 namespace nav2_behavior_tree
 {
 
@@ -29,6 +31,7 @@ IsBatteryLowCondition::IsBatteryLowCondition(
   is_voltage_(false),
   is_battery_low_(false)
 {
+  LOG_TRACE("BT plugin function entry: IsBatteryLowCondition::IsBatteryLowCondition");
   getInput("min_battery", min_battery_);
   getInput("battery_topic", battery_topic_);
   getInput("is_voltage", is_voltage_);
@@ -49,6 +52,7 @@ IsBatteryLowCondition::IsBatteryLowCondition(
 
 BT::NodeStatus IsBatteryLowCondition::tick()
 {
+  LOG_TRACE("BT plugin function entry: IsBatteryLowCondition::tick");
   callback_group_executor_.spin_some();
   if (is_battery_low_) {
     return BT::NodeStatus::SUCCESS;
@@ -58,6 +62,7 @@ BT::NodeStatus IsBatteryLowCondition::tick()
 
 void IsBatteryLowCondition::batteryCallback(sensor_msgs::msg::BatteryState::SharedPtr msg)
 {
+  LOG_TRACE("BT plugin function entry: IsBatteryLowCondition::batteryCallback");
   if (is_voltage_) {
     is_battery_low_ = msg->voltage <= min_battery_;
   } else {
@@ -70,5 +75,6 @@ void IsBatteryLowCondition::batteryCallback(sensor_msgs::msg::BatteryState::Shar
 #include "behaviortree_cpp_v3/bt_factory.h"
 BT_REGISTER_NODES(factory)
 {
+  LOG_INFO("Registering BT plugin nodes from nav2_ws/src/navigation2/nav2_behavior_tree/plugins/condition/is_battery_low_condition.cpp");
   factory.registerNodeType<nav2_behavior_tree::IsBatteryLowCondition>("IsBatteryLow");
 }

@@ -18,6 +18,8 @@
 
 #include "nav2_behavior_tree/plugins/action/compute_path_through_poses_action.hpp"
 
+#include "spdlog_wrapper.hpp"
+
 namespace nav2_behavior_tree
 {
 
@@ -31,6 +33,7 @@ ComputePathThroughPosesAction::ComputePathThroughPosesAction(
 
 void ComputePathThroughPosesAction::on_tick()
 {
+  LOG_TRACE("BT plugin function entry: ComputePathThroughPosesAction::on_tick");
   getInput("goals", goal_.goals);
   getInput("planner_id", goal_.planner_id);
   if (getInput("start", goal_.start)) {
@@ -40,12 +43,14 @@ void ComputePathThroughPosesAction::on_tick()
 
 BT::NodeStatus ComputePathThroughPosesAction::on_success()
 {
+  LOG_TRACE("BT plugin function entry: ComputePathThroughPosesAction::on_success");
   setOutput("path", result_.result->path);
   return BT::NodeStatus::SUCCESS;
 }
 
 BT::NodeStatus ComputePathThroughPosesAction::on_aborted()
 {
+  LOG_TRACE("BT plugin function entry: ComputePathThroughPosesAction::on_aborted");
   nav_msgs::msg::Path empty_path;
   setOutput("path", empty_path);
   return BT::NodeStatus::FAILURE;
@@ -53,6 +58,7 @@ BT::NodeStatus ComputePathThroughPosesAction::on_aborted()
 
 BT::NodeStatus ComputePathThroughPosesAction::on_cancelled()
 {
+  LOG_TRACE("BT plugin function entry: ComputePathThroughPosesAction::on_cancelled");
   nav_msgs::msg::Path empty_path;
   setOutput("path", empty_path);
   return BT::NodeStatus::SUCCESS;
@@ -63,6 +69,7 @@ BT::NodeStatus ComputePathThroughPosesAction::on_cancelled()
 #include "behaviortree_cpp_v3/bt_factory.h"
 BT_REGISTER_NODES(factory)
 {
+  LOG_INFO("Registering BT plugin nodes from nav2_ws/src/navigation2/nav2_behavior_tree/plugins/action/compute_path_through_poses_action.cpp");
   BT::NodeBuilder builder =
     [](const std::string & name, const BT::NodeConfiguration & config)
     {

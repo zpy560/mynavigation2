@@ -21,10 +21,12 @@
 int main(int argc, char ** argv)
 {
   rclcpp::init(argc, argv);
+  SpdlogWrapper::init("nav2_behaviors", "behavior_server");
   auto recoveries_node = std::make_shared<behavior_server::BehaviorServer>();
 
   rclcpp::spin(recoveries_node->get_node_base_interface());
   rclcpp::shutdown();
+  SpdlogWrapper::shutdown();
 
   return 0;
 }

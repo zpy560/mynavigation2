@@ -17,6 +17,8 @@
 
 #include "nav2_behavior_tree/plugins/action/compute_path_to_pose_action.hpp"
 
+#include "spdlog_wrapper.hpp"
+
 namespace nav2_behavior_tree
 {
 
@@ -30,6 +32,7 @@ ComputePathToPoseAction::ComputePathToPoseAction(
 
 void ComputePathToPoseAction::on_tick()
 {
+  LOG_TRACE("BT plugin function entry: ComputePathToPoseAction::on_tick");
   getInput("goal", goal_.goal);
   getInput("planner_id", goal_.planner_id);
   if (getInput("start", goal_.start)) {
@@ -39,12 +42,14 @@ void ComputePathToPoseAction::on_tick()
 
 BT::NodeStatus ComputePathToPoseAction::on_success()
 {
+  LOG_TRACE("BT plugin function entry: ComputePathToPoseAction::on_success");
   setOutput("path", result_.result->path);
   return BT::NodeStatus::SUCCESS;
 }
 
 BT::NodeStatus ComputePathToPoseAction::on_aborted()
 {
+  LOG_TRACE("BT plugin function entry: ComputePathToPoseAction::on_aborted");
   nav_msgs::msg::Path empty_path;
   setOutput("path", empty_path);
   return BT::NodeStatus::FAILURE;
@@ -52,6 +57,7 @@ BT::NodeStatus ComputePathToPoseAction::on_aborted()
 
 BT::NodeStatus ComputePathToPoseAction::on_cancelled()
 {
+  LOG_TRACE("BT plugin function entry: ComputePathToPoseAction::on_cancelled");
   nav_msgs::msg::Path empty_path;
   setOutput("path", empty_path);
   return BT::NodeStatus::SUCCESS;
@@ -59,6 +65,7 @@ BT::NodeStatus ComputePathToPoseAction::on_cancelled()
 
 void ComputePathToPoseAction::halt()
 {
+  LOG_TRACE("BT plugin function entry: ComputePathToPoseAction::halt");
   nav_msgs::msg::Path empty_path;
   setOutput("path", empty_path);
   BtActionNode::halt();
@@ -69,6 +76,7 @@ void ComputePathToPoseAction::halt()
 #include "behaviortree_cpp_v3/bt_factory.h"
 BT_REGISTER_NODES(factory)
 {
+  LOG_INFO("Registering BT plugin nodes from nav2_ws/src/navigation2/nav2_behavior_tree/plugins/action/compute_path_to_pose_action.cpp");
   BT::NodeBuilder builder =
     [](const std::string & name, const BT::NodeConfiguration & config)
     {

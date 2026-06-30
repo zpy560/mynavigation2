@@ -86,9 +86,7 @@ Status Spin::onRun(const std::shared_ptr<const SpinAction::Goal> command)
   relative_yaw_ = 0.0;
 
   cmd_yaw_ = command->target_yaw;
-  RCLCPP_INFO(
-    logger_, "Turning %0.2f for spin behavior.",
-    cmd_yaw_);
+  LOG_INFO("Turning {:.2f} for spin behavior.", cmd_yaw_);
 
   command_time_allowance_ = command->time_allowance;
   end_time_ = this->clock_->now() + command_time_allowance_;

@@ -17,6 +17,8 @@
 
 #include "nav2_behavior_tree/plugins/action/clear_costmap_service.hpp"
 
+#include "spdlog_wrapper.hpp"
+
 namespace nav2_behavior_tree
 {
 
@@ -29,6 +31,7 @@ ClearEntireCostmapService::ClearEntireCostmapService(
 
 void ClearEntireCostmapService::on_tick()
 {
+  LOG_TRACE("BT plugin function entry: ClearEntireCostmapService::on_tick");
   increment_recovery_count();
 }
 
@@ -41,6 +44,7 @@ ClearCostmapExceptRegionService::ClearCostmapExceptRegionService(
 
 void ClearCostmapExceptRegionService::on_tick()
 {
+  LOG_TRACE("BT plugin function entry: ClearCostmapExceptRegionService::on_tick");
   getInput("reset_distance", request_->reset_distance);
   increment_recovery_count();
 }
@@ -54,6 +58,7 @@ ClearCostmapAroundRobotService::ClearCostmapAroundRobotService(
 
 void ClearCostmapAroundRobotService::on_tick()
 {
+  LOG_TRACE("BT plugin function entry: ClearCostmapAroundRobotService::on_tick");
   getInput("reset_distance", request_->reset_distance);
   increment_recovery_count();
 }
@@ -63,6 +68,7 @@ void ClearCostmapAroundRobotService::on_tick()
 #include "behaviortree_cpp_v3/bt_factory.h"
 BT_REGISTER_NODES(factory)
 {
+  LOG_INFO("Registering BT plugin nodes from nav2_ws/src/navigation2/nav2_behavior_tree/plugins/action/clear_costmap_service.cpp");
   factory.registerNodeType<nav2_behavior_tree::ClearEntireCostmapService>("ClearEntireCostmap");
   factory.registerNodeType<nav2_behavior_tree::ClearCostmapExceptRegionService>(
     "ClearCostmapExceptRegion");

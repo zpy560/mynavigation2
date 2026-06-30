@@ -71,6 +71,7 @@ bool SimpleSmoother::smooth(
   for (unsigned int i = 0; i != path_segments.size(); i++) {
     if (path_segments[i].end - path_segments[i].start > 9) {
       // Populate path segment
+      // 中文：填充路径片段。
       curr_path_segment.poses.clear();
       std::copy(
         path.poses.begin() + path_segments[i].start,
@@ -78,14 +79,17 @@ bool SimpleSmoother::smooth(
         std::back_inserter(curr_path_segment.poses));
 
       // Make sure we're still able to smooth with time remaining
+      // 中文：确保剩余时间仍允许继续平滑。
       steady_clock::time_point now = steady_clock::now();
       time_remaining = max_time.seconds() - duration_cast<duration<double>>(now - start).count();
 
       // Smooth path segment naively
+      // 中文：平滑路径片段。 naively
       success = success && smoothImpl(
         curr_path_segment, reversing_segment, costmap.get(), time_remaining);
 
       // Assemble the path changes to the main path
+      // 中文：将路径片段改动合并回主路径。
       std::copy(
         curr_path_segment.poses.begin(),
         curr_path_segment.poses.end(),
@@ -119,6 +123,7 @@ bool SimpleSmoother::smoothImpl(
     change = 0.0;
 
     // Make sure the smoothing function will converge
+    // 中文：确保平滑函数能够收敛。
     if (its >= max_its_) {
       RCLCPP_WARN(
         logger_,
@@ -129,6 +134,7 @@ bool SimpleSmoother::smoothImpl(
     }
 
     // Make sure still have time left to process
+    // 中文：确保仍有剩余时间可处理。
     steady_clock::time_point b = steady_clock::now();
     rclcpp::Duration timespan(duration_cast<duration<double>>(b - a));
     if (timespan > max_dur) {
@@ -149,12 +155,14 @@ bool SimpleSmoother::smoothImpl(
         y_i_org = y_i;
 
         // Smooth based on local 3 point neighborhood and original data locations
+        // 中文：基于局部 3 点邻域和原始数据位置进行平滑。
         y_i += data_w_ * (x_i - y_i) + smooth_w_ * (y_ip1 + y_m1 - (2.0 * y_i));
         setFieldByDim(new_path.poses[i], j, y_i);
         change += abs(y_i - y_i_org);
       }
 
       // validate update is admissible, only checks cost if a valid costmap pointer is provided
+      // 中文：验证更新是否可接受；仅当提供有效 costmap 指针时检查代价。
       float cost = 0.0;
       if (costmap) {
         costmap->worldToMap(
@@ -179,7 +187,9 @@ bool SimpleSmoother::smoothImpl(
   }
 
   // Lets do additional refinement, it shouldn't take more than a couple milliseconds
+  // 中文：执行额外细化，预计只需几毫秒。
   // but really puts the path quality over the top.
+  // 中文：但确实能显著提升路径质量。
   if (do_refinement_ && refinement_ctr_ < 4) {
     refinement_ctr_++;
     smoothImpl(new_path, reversing_segment, costmap, max_time);

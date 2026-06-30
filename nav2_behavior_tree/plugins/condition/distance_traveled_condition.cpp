@@ -21,6 +21,8 @@
 
 #include "nav2_behavior_tree/plugins/condition/distance_traveled_condition.hpp"
 
+#include "spdlog_wrapper.hpp"
+
 namespace nav2_behavior_tree
 {
 
@@ -33,6 +35,7 @@ DistanceTraveledCondition::DistanceTraveledCondition(
   global_frame_("map"),
   robot_base_frame_("base_link")
 {
+  LOG_TRACE("BT plugin function entry: DistanceTraveledCondition::DistanceTraveledCondition");
   getInput("distance", distance_);
   getInput("global_frame", global_frame_);
   getInput("robot_base_frame", robot_base_frame_);
@@ -43,11 +46,13 @@ DistanceTraveledCondition::DistanceTraveledCondition(
 
 BT::NodeStatus DistanceTraveledCondition::tick()
 {
+  LOG_TRACE("BT plugin function entry: DistanceTraveledCondition::tick");
   if (status() == BT::NodeStatus::IDLE) {
     if (!nav2_util::getCurrentPose(
         start_pose_, *tf_, global_frame_, robot_base_frame_,
         transform_tolerance_))
     {
+  LOG_TRACE("BT plugin function entry: nav2_util::getCurrentPose");
       RCLCPP_DEBUG(node_->get_logger(), "Current robot pose is not available.");
     }
     return BT::NodeStatus::FAILURE;
@@ -59,6 +64,7 @@ BT::NodeStatus DistanceTraveledCondition::tick()
       current_pose, *tf_, global_frame_, robot_base_frame_,
       transform_tolerance_))
   {
+  LOG_TRACE("BT plugin function entry: nav2_util::getCurrentPose");
     RCLCPP_DEBUG(node_->get_logger(), "Current robot pose is not available.");
     return BT::NodeStatus::FAILURE;
   }
@@ -82,5 +88,6 @@ BT::NodeStatus DistanceTraveledCondition::tick()
 #include "behaviortree_cpp_v3/bt_factory.h"
 BT_REGISTER_NODES(factory)
 {
+  LOG_INFO("Registering BT plugin nodes from nav2_ws/src/navigation2/nav2_behavior_tree/plugins/condition/distance_traveled_condition.cpp");
   factory.registerNodeType<nav2_behavior_tree::DistanceTraveledCondition>("DistanceTraveled");
 }

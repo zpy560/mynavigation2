@@ -23,6 +23,8 @@
 
 #include "rclcpp/rclcpp.hpp"
 
+#include "spdlog_wrapper.hpp"
+
 namespace nav2_behavior_tree
 {
 
@@ -33,6 +35,7 @@ GoalUpdater::GoalUpdater(
   const BT::NodeConfiguration & conf)
 : BT::DecoratorNode(name, conf)
 {
+  LOG_TRACE("BT plugin function entry: GoalUpdater::GoalUpdater");
   node_ = config().blackboard->get<rclcpp::Node::SharedPtr>("node");
   callback_group_ = node_->create_callback_group(
     rclcpp::CallbackGroupType::MutuallyExclusive,
@@ -53,6 +56,7 @@ GoalUpdater::GoalUpdater(
 
 inline BT::NodeStatus GoalUpdater::tick()
 {
+  LOG_TRACE("BT plugin function entry: GoalUpdater::tick");
   geometry_msgs::msg::PoseStamped goal;
 
   getInput("input_goal", goal);
@@ -79,6 +83,7 @@ inline BT::NodeStatus GoalUpdater::tick()
 void
 GoalUpdater::callback_updated_goal(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
 {
+  LOG_TRACE("BT plugin function entry: GoalUpdater::callback_updated_goal");
   last_goal_received_ = *msg;
 }
 
@@ -87,5 +92,6 @@ GoalUpdater::callback_updated_goal(const geometry_msgs::msg::PoseStamped::Shared
 #include "behaviortree_cpp_v3/bt_factory.h"
 BT_REGISTER_NODES(factory)
 {
+  LOG_INFO("Registering BT plugin nodes from nav2_ws/src/navigation2/nav2_behavior_tree/plugins/decorator/goal_updater_node.cpp");
   factory.registerNodeType<nav2_behavior_tree::GoalUpdater>("GoalUpdater");
 }

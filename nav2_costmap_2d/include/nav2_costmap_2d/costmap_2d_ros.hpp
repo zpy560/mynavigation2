@@ -69,7 +69,12 @@ namespace nav2_costmap_2d
 
 /** @brief A ROS wrapper for a 2D Costmap. Handles subscribing to
  * topics that provide observations about obstacles in either the form
- * of PointCloud or LaserScan messages. */
+ * of PointCloud or LaserScan messages.
+ *
+ * 中文：Costmap2DROS 是 Nav2 costmap 的 ROS 生命周期入口。它读取参数、加载
+ * static / obstacle / inflation 等插件，定时获取机器人 TF 位姿，驱动
+ * LayeredCostmap 融合各层数据，并通过 Costmap2DPublisher 输出最终 master costmap。
+ */
 class Costmap2DROS : public nav2_util::LifecycleNode
 {
 public:
@@ -173,6 +178,8 @@ public:
 
   /**
    * @brief Update the map with the layered costmap / plugins
+   * 中文：一次 costmap 数据流更新：TF 当前位姿 -> LayeredCostmap::updateMap()
+   * -> 各 Layer updateBounds/updateCosts -> 发布机器人 footprint。
    */
   void updateMap();
 
@@ -355,6 +362,7 @@ protected:
 
   /**
    * @brief Function on timer for costmap update
+   * 中文：后台更新线程入口，按 update_frequency 周期触发 updateMap 和 costmap 发布。
    */
   void mapUpdateLoop(double frequency);
   bool map_update_thread_shutdown_{false};
@@ -369,6 +377,7 @@ protected:
 
   /**
    * @brief Get parameters for node
+   * 中文：读取 costmap 配置输入，包括 frame、尺寸、分辨率、插件列表、发布频率和 footprint。
    */
   void getParameters();
   bool always_send_full_costmap_{false};

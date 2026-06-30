@@ -22,6 +22,7 @@ find_package(nav2_util REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(nav2_core REQUIRED)
 find_package(pluginlib REQUIRED)
+find_package(spdlog_wrapper REQUIRED)
 
 nav2_package()
 
@@ -55,6 +56,7 @@ set(dependencies
   image_transport
   cv_bridge
   OpenCV
+  spdlog_wrapper
 )
 
 ament_target_dependencies(${executable_name}

@@ -19,6 +19,8 @@
 
 using namespace std::chrono_literals; // NOLINT
 
+#include "spdlog_wrapper.hpp"
+
 namespace nav2_behavior_tree
 {
 
@@ -31,6 +33,7 @@ IsStuckCondition::IsStuckCondition(
   current_accel_(0.0),
   brake_accel_limit_(-10.0)
 {
+  LOG_TRACE("BT plugin function entry: IsStuckCondition::IsStuckCondition");
   node_ = config().blackboard->get<rclcpp::Node::SharedPtr>("node");
   callback_group_ = node_->create_callback_group(
     rclcpp::CallbackGroupType::MutuallyExclusive,
@@ -53,6 +56,7 @@ IsStuckCondition::IsStuckCondition(
 
 IsStuckCondition::~IsStuckCondition()
 {
+  LOG_TRACE("BT plugin function entry: IsStuckCondition::~IsStuckCondition");
   RCLCPP_DEBUG(node_->get_logger(), "Shutting down IsStuckCondition BT node");
   callback_group_executor_.cancel();
   callback_group_executor_thread.join();
@@ -60,6 +64,7 @@ IsStuckCondition::~IsStuckCondition()
 
 void IsStuckCondition::onOdomReceived(const typename nav_msgs::msg::Odometry::SharedPtr msg)
 {
+  LOG_TRACE("BT plugin function entry: IsStuckCondition::onOdomReceived");
   RCLCPP_INFO_ONCE(node_->get_logger(), "Got odometry");
 
   while (odom_history_.size() >= odom_history_size_) {
@@ -74,6 +79,7 @@ void IsStuckCondition::onOdomReceived(const typename nav_msgs::msg::Odometry::Sh
 
 BT::NodeStatus IsStuckCondition::tick()
 {
+  LOG_TRACE("BT plugin function entry: IsStuckCondition::tick");
   // TODO(orduno) #383 Once check for is stuck and state calculations are moved to robot class
   //              this becomes
   // if (robot_state_.isStuck()) {
@@ -89,6 +95,7 @@ BT::NodeStatus IsStuckCondition::tick()
 
 void IsStuckCondition::logStuck(const std::string & msg) const
 {
+  LOG_TRACE("BT plugin function entry: IsStuckCondition::logStuck");
   static std::string prev_msg;
 
   if (msg == prev_msg) {
@@ -101,6 +108,7 @@ void IsStuckCondition::logStuck(const std::string & msg) const
 
 void IsStuckCondition::updateStates()
 {
+  LOG_TRACE("BT plugin function entry: IsStuckCondition::updateStates");
   // Approximate acceleration
   // TODO(orduno) #400 Smooth out velocity history for better accel approx.
   if (odom_history_.size() > 2) {
@@ -123,6 +131,7 @@ void IsStuckCondition::updateStates()
 
 bool IsStuckCondition::isStuck()
 {
+  LOG_TRACE("BT plugin function entry: IsStuckCondition::isStuck");
   // TODO(orduno) #400 The robot getting stuck can result on different types of motion
   // depending on the state prior to getting stuck (sudden change in accel, not moving at all,
   // random oscillations, etc). For now, we only address the case where there is a sudden
@@ -146,5 +155,6 @@ bool IsStuckCondition::isStuck()
 #include "behaviortree_cpp_v3/bt_factory.h"
 BT_REGISTER_NODES(factory)
 {
+  LOG_INFO("Registering BT plugin nodes from nav2_ws/src/navigation2/nav2_behavior_tree/plugins/condition/is_stuck_condition.cpp");
   factory.registerNodeType<nav2_behavior_tree::IsStuckCondition>("IsStuck");
 }

@@ -29,26 +29,32 @@ using WaitAction = nav2_msgs::action::Wait;
 /**
  * @class nav2_behaviors::Wait
  * @brief An action server behavior for waiting a fixed duration
+  * 中文：用于等待固定时长的 action server behavior。
  */
 class Wait : public TimedBehavior<WaitAction>
 {
 public:
   /**
    * @brief A constructor for nav2_behaviors::Wait
+   * 中文：nav2_behaviors::Wait 的构造函数。
    */
   Wait();
   ~Wait();
 
   /**
    * @brief Initialization to run behavior
+   * 中文：运行 behavior 前的初始化。
    * @param command Goal to execute
    * @return Status of behavior
+   * 中文：behavior 状态。
    */
   Status onRun(const std::shared_ptr<const WaitAction::Goal> command) override;
 
   /**
    * @brief Loop function to run behavior
+   * 中文：运行 behavior 的循环函数。
    * @return Status of behavior
+   * 中文：behavior 状态。
    */
   Status onCycleUpdate() override;
 

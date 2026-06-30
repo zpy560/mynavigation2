@@ -31,6 +31,7 @@
 #include "std_srvs/srv/trigger.hpp"
 #include "bondcpp/bond.hpp"
 #include "diagnostic_updater/diagnostic_updater.hpp"
+#include "spdlog_wrapper.hpp"
 
 
 namespace nav2_lifecycle_manager

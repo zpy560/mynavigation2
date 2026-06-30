@@ -1,0 +1,220 @@
+default:
+  log_dir: /home/byd/logs
+  max_file_size_mb: 10
+  max_files: 5
+  console_level: trace                 # 控制台输出等级 trace/debug/info/warn/error/critical/off
+  file_level: trace                    # 文件输出等级
+  flush_interval_seconds: 0            # 文件刷新间隔：0表示不启动定期刷新
+  append_ros_timestamp: false          # 是否在 ROS 日志后附加 ROS 时间戳
+  raw_ros_timestamp: false             # true: 输出原始纳秒整数；false: 输出格式化时间字符串
+
+velocity_smoother:
+  log_dir: /home/byd/logs
+  max_file_size_mb: 10
+  max_files: 5
+  console_level: trace
+  file_level: trace
+  flush_interval_seconds: 0
+  append_ros_timestamp: false
+  raw_ros_timestamp: false
+
+waypoint_follower:
+  log_dir: /home/byd/logs
+  max_file_size_mb: 10
+  max_files: 5
+  console_level: warn
+  file_level: warn
+  flush_interval_seconds: 0
+  append_ros_timestamp: false
+  raw_ros_timestamp: false
+
+smoother_server:
+  log_dir: /home/byd/logs
+  max_file_size_mb: 10
+  max_files: 5
+  console_level: warn
+  file_level: warn
+  flush_interval_seconds: 0
+  append_ros_timestamp: false
+  raw_ros_timestamp: false
+
+planner_server:
+  log_dir: /home/byd/logs
+  max_file_size_mb: 10
+  max_files: 5
+  console_level: trace
+  file_level: trace
+  flush_interval_seconds: 0
+  append_ros_timestamp: false
+  raw_ros_timestamp: false
+
+# lifecycle_manager_localization:
+#   log_dir: /home/byd/logs
+#   max_file_size_mb: 10
+#   max_files: 5
+#   console_level: trace
+#   file_level: trace
+#   flush_interval_seconds: 0
+#   append_ros_timestamp: false
+#   raw_ros_timestamp: false
+
+# lifecycle_manager_navigation:
+#   log_dir: /home/byd/logs
+#   max_file_size_mb: 10
+#   max_files: 5
+#   console_level: trace
+#   file_level: trace
+#   flush_interval_seconds: 0
+#   append_ros_timestamp: false
+#   raw_ros_timestamp: false
+
+controller_server:
+  log_dir: /home/byd/logs
+  max_file_size_mb: 10
+  max_files: 5
+  console_level: warn
+  file_level: warn
+  flush_interval_seconds: 0
+  append_ros_timestamp: false
+  raw_ros_timestamp: false
+
+lifecycle_manager:
+  log_dir: /home/byd/logs
+  max_file_size_mb: 10
+  max_files: 5
+  console_level: trace
+  file_level: trace
+  flush_interval_seconds: 0
+  append_ros_timestamp: false
+  raw_ros_timestamp: false
+
+lio_localization_node:
+  log_dir: /home/byd/logs
+  max_file_size_mb: 150
+  max_files: 5
+  console_level: error
+  file_level: info
+  flush_interval_seconds: 0
+  append_ros_timestamp: false
+  raw_ros_timestamp: false
+
+iwo_2deskf_node:
+  log_dir: /home/byd/logs
+  max_file_size_mb: 100
+  max_files: 5
+  console_level: error
+  file_level: info
+  flush_interval_seconds: 0
+  append_ros_timestamp: false
+  raw_ros_timestamp: false
+
+fusion_location_node:
+  log_dir: /home/byd/logs
+  max_file_size_mb: 100
+  max_files: 5
+  console_level: error
+  file_level: info
+  flush_interval_seconds: 0
+  append_ros_timestamp: false
+  raw_ros_timestamp: false
+
+
+lidar_merge_node:
+  log_dir: /home/byd/logs
+  max_file_size_mb: 10
+  max_files: 5
+  console_level: trace
+  file_level: trace
+  flush_interval_seconds: 0
+  append_ros_timestamp: false
+  raw_ros_timestamp: false
+
+segment_node:
+  log_dir: /home/byd/logs
+  max_file_size_mb: 10
+  max_files: 5
+  console_level: trace
+  file_level: trace
+  flush_interval_seconds: 0
+  append_ros_timestamp: false
+  raw_ros_timestamp: false
+
+bevfusion_node:
+  log_dir: /home/byd/logs
+  max_file_size_mb: 10
+  max_files: 5
+  console_level: trace
+  file_level: trace
+  flush_interval_seconds: 0
+  append_ros_timestamp: false
+  raw_ros_timestamp: false
+
+perception_fusion_node:
+  log_dir: /home/byd/logs
+  max_file_size_mb: 10
+  max_files: 5
+  console_level: trace
+  file_level: trace
+  flush_interval_seconds: 0
+  append_ros_timestamp: false
+  raw_ros_timestamp: false
+
+tracking_node:
+  log_dir: /home/byd/logs
+  max_file_size_mb: 10
+  max_files: 5
+  console_level: trace
+  file_level: trace
+  flush_interval_seconds: 0
+  append_ros_timestamp: false
+  raw_ros_timestamp: false
+
+trajectory_node:
+  log_dir: /home/byd/logs
+  max_file_size_mb: 10
+  max_files: 5
+  console_level: trace
+  file_level: trace
+  flush_interval_seconds: 0
+  append_ros_timestamp: false
+  raw_ros_timestamp: false
+
+bevstitch_node:
+  log_dir: /home/byd/logs
+  max_file_size_mb: 10
+  max_files: 5
+  console_level: trace
+  file_level: trace
+  flush_interval_seconds: 0
+  append_ros_timestamp: false
+  raw_ros_timestamp: false
+
+slot_detect_node:
+  log_dir: /home/byd/logs
+  max_file_size_mb: 10
+  max_files: 5
+  console_level: trace
+  file_level: trace
+  flush_interval_seconds: 0
+  append_ros_timestamp: false
+  raw_ros_timestamp: false
+
+slot_fusion_node:
+  log_dir: /home/byd/logs
+  max_file_size_mb: 10
+  max_files: 5
+  console_level: trace
+  file_level: trace
+  flush_interval_seconds: 0
+  append_ros_timestamp: false
+  raw_ros_timestamp: false
+
+marker_renderer_node:
+  log_dir: /home/byd/logs
+  max_file_size_mb: 10
+  max_files: 5
+  console_level: trace
+  file_level: trace
+  flush_interval_seconds: 0
+  append_ros_timestamp: false
+  raw_ros_timestamp: false

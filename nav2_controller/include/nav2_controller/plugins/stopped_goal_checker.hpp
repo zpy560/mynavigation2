@@ -49,12 +49,14 @@ namespace nav2_controller
 /**
  * @class StoppedGoalChecker
  * @brief Goal Checker plugin that checks the position difference and velocity
+  * 中文：检查位置偏差和速度的 GoalChecker 插件。
  */
 class StoppedGoalChecker : public SimpleGoalChecker
 {
 public:
   StoppedGoalChecker();
   // Standard GoalChecker Interface
+  // 中文：标准 GoalChecker 接口。
   void initialize(
     const rclcpp_lifecycle::LifecycleNode::WeakPtr & parent,
     const std::string & plugin_name,
@@ -69,12 +71,15 @@ public:
 protected:
   double rot_stopped_velocity_, trans_stopped_velocity_;
   // Dynamic parameters handler
+  // 中文：动态参数处理器。
   rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr dyn_params_handler_;
   std::string plugin_name_;
 
   /**
-   * @brief Callback executed when a paramter change is detected
+   * @brief Callback executed when a parameter change is detected
+   * 中文：检测到参数变化时执行的回调。
    * @param parameters list of changed parameters
+   * 中文：已变化的参数列表。
    */
   rcl_interfaces::msg::SetParametersResult
   dynamicParametersCallback(std::vector<rclcpp::Parameter> parameters);

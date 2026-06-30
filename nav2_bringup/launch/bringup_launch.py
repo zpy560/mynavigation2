@@ -29,6 +29,8 @@ from nav2_common.launch import ReplaceString, RewrittenYaml
 
 
 def generate_launch_description():
+    # 中文注释：bringup_launch 是 Nav2 主入口，负责把定位、导航和可选 SLAM
+    # 组合到同一个 launch 图里；仿真、机器人模型和 RViz 由更外层 launch 决定。
     # Get the launch directory
     bringup_dir = get_package_share_directory('nav2_bringup')
     launch_dir = os.path.join(bringup_dir, 'launch')
@@ -92,10 +94,12 @@ def generate_launch_description():
     declare_slam_cmd = DeclareLaunchArgument(
         'slam',
         default_value='False',
+        # default_value='True',
         description='Whether run a SLAM')
 
     declare_map_yaml_cmd = DeclareLaunchArgument(
         'map',
+        default_value=os.path.join(bringup_dir, 'maps', 'out.yaml'),
         description='Full path to map yaml file to load')
 
     declare_use_sim_time_cmd = DeclareLaunchArgument(
@@ -113,7 +117,7 @@ def generate_launch_description():
         description='Automatically startup the nav2 stack')
 
     declare_use_composition_cmd = DeclareLaunchArgument(
-        'use_composition', default_value='True',
+        'use_composition', default_value='False',
         description='Whether to use composed bringup')
 
     declare_use_respawn_cmd = DeclareLaunchArgument(
@@ -126,10 +130,14 @@ def generate_launch_description():
 
     # Specify the actions
     bringup_cmd_group = GroupAction([
+        # 中文注释：命名空间在这里一次性压入，后续定位和导航节点都会继承，
+        # 多机器人场景依靠这个机制隔离 topic、service 和 action 名称。
         PushRosNamespace(
             condition=IfCondition(use_namespace),
             namespace=namespace),
 
+        # 中文注释：组合模式会先启动一个 component_container，后续 launch
+        # 把各生命周期节点加载进同一进程；非组合模式则各节点独立进程运行。
         Node(
             condition=IfCondition(use_composition),
             name='nav2_container',
@@ -149,6 +157,8 @@ def generate_launch_description():
                               'use_respawn': use_respawn,
                               'params_file': params_file}.items()),
 
+        # 中文注释：slam=False 时走定位链路，map_server 读取静态地图，
+        # AMCL 使用激光和里程计在地图中估计 map->odom。
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(os.path.join(launch_dir,
                                                        'localization_launch.py')),
@@ -162,6 +172,8 @@ def generate_launch_description():
                               'use_respawn': use_respawn,
                               'container_name': 'nav2_container'}.items()),
 
+        # 中文注释：导航链路始终启动，包含 planner、controller、BT navigator、
+        # recovery/behavior、smoother、waypoint follower 等核心运行节点。
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(os.path.join(launch_dir, 'navigation_launch.py')),
             launch_arguments={'namespace': namespace,

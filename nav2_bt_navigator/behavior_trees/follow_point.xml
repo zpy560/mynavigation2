@@ -14,8 +14,21 @@
         </Sequence>
       </RateController>
       <KeepRunningUntilFailure>
-        <FollowPath path="{truncated_path}" controller_id="FollowPath"/>
+        <FollowPath path="{truncated_path}" controller_id=""/>
       </KeepRunningUntilFailure>
     </PipelineSequence>
   </BehaviorTree>
 </root>
+
+<!--
+中文说明：
+1. 这棵树用于跟随动态目标点，但只跟到目标附近一定距离，不直接贴到目标点本身。
+2. GoalUpdater 读取输入 {goal} 并输出 {updated_goal}，用于跟踪运行中变化的目标位姿。
+3. RateController 以 1Hz 触发规划序列：先基于 {updated_goal} 调用 ComputePathToPose 生成 {path}，
+   再用 TruncatePath 截短路径。
+4. TruncatePath distance=1.0 会把全局路径截断到距离目标约 1 米处，输出 {truncated_path}，
+   使机器人保持跟随距离。
+5. KeepRunningUntilFailure 包裹 FollowPath，让控制分支在成功到达截断路径末端后继续保持运行，
+   直到底层 FollowPath 失败或外部取消。
+6. 该树没有恢复分支，适合动态跟随行为验证；若规划或控制失败，任务会结束。
+-->

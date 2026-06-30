@@ -18,6 +18,8 @@
 
 #include "nav2_behavior_tree/plugins/action/smooth_path_action.hpp"
 
+#include "spdlog_wrapper.hpp"
+
 namespace nav2_behavior_tree
 {
 
@@ -31,6 +33,7 @@ SmoothPathAction::SmoothPathAction(
 
 void SmoothPathAction::on_tick()
 {
+  LOG_TRACE("BT plugin function entry: SmoothPathAction::on_tick");
   getInput("unsmoothed_path", goal_.path);
   getInput("smoother_id", goal_.smoother_id);
   double max_smoothing_duration;
@@ -41,6 +44,7 @@ void SmoothPathAction::on_tick()
 
 BT::NodeStatus SmoothPathAction::on_success()
 {
+  LOG_TRACE("BT plugin function entry: SmoothPathAction::on_success");
   setOutput("smoothed_path", result_.result->path);
   setOutput("smoothing_duration", rclcpp::Duration(result_.result->smoothing_duration).seconds());
   setOutput("was_completed", result_.result->was_completed);
@@ -52,6 +56,7 @@ BT::NodeStatus SmoothPathAction::on_success()
 #include "behaviortree_cpp_v3/bt_factory.h"
 BT_REGISTER_NODES(factory)
 {
+  LOG_INFO("Registering BT plugin nodes from nav2_ws/src/navigation2/nav2_behavior_tree/plugins/action/smooth_path_action.cpp");
   BT::NodeBuilder builder =
     [](const std::string & name, const BT::NodeConfiguration & config)
     {

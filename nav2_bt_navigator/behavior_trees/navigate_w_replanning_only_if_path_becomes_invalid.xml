@@ -5,7 +5,7 @@
   <BehaviorTree ID="MainTree">
     <PipelineSequence name="NavigateWithReplanning">
       <RateController hz="1.0">
-        <Fallback> 
+        <Fallback>
           <ReactiveSequence>
             <Inverter>
               <GlobalUpdatedGoal/>
@@ -15,7 +15,20 @@
           <ComputePathToPose goal="{goal}" path="{path}" planner_id="GridBased"/>
         </Fallback>
       </RateController>
-      <FollowPath path="{path}" controller_id="FollowPath"/>
+      <FollowPath path="{path}" controller_id=""/>
     </PipelineSequence>
   </BehaviorTree>
 </root>
+
+<!--
+中文说明：
+1. 这是简化版“路径失效才重规划”行为树，不包含恢复动作。
+2. PipelineSequence 让规划检查和路径跟踪并行推进：前半段决定是否更新 {path}，后半段持续 FollowPath。
+3. RateController 以 1Hz 检查当前路径；Fallback 的第一个分支用于判断是否继续复用已有路径。
+4. ReactiveSequence 中，GlobalUpdatedGoal 经过 Inverter 后表示目标没有更新，IsPathValid 表示
+   当前 {path} 仍有效；两者都成功时，Fallback 不会执行 ComputePathToPose。
+5. 一旦目标更新或路径失效，ComputePathToPose 会读取 {goal} 调用 /compute_path_to_pose，
+   并把结果写回 blackboard["path"]。
+6. FollowPath 读取 {path} 调用 /follow_path；由于没有 RecoveryNode，规划或控制失败会直接导致
+   整棵树失败。
+-->

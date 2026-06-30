@@ -17,6 +17,8 @@
 
 #include "nav2_behavior_tree/plugins/action/assisted_teleop_action.hpp"
 
+#include "spdlog_wrapper.hpp"
+
 namespace nav2_behavior_tree
 {
 
@@ -36,6 +38,7 @@ AssistedTeleopAction::AssistedTeleopAction(
 
 void AssistedTeleopAction::on_tick()
 {
+  LOG_TRACE("BT plugin function entry: AssistedTeleopAction::on_tick");
   if (is_recovery_) {
     increment_recovery_count();
   }
@@ -43,6 +46,7 @@ void AssistedTeleopAction::on_tick()
 
 BT::NodeStatus AssistedTeleopAction::on_aborted()
 {
+  LOG_TRACE("BT plugin function entry: AssistedTeleopAction::on_aborted");
   return is_recovery_ ? BT::NodeStatus::FAILURE : BT::NodeStatus::SUCCESS;
 }
 
@@ -51,6 +55,7 @@ BT::NodeStatus AssistedTeleopAction::on_aborted()
 #include "behaviortree_cpp_v3/bt_factory.h"
 BT_REGISTER_NODES(factory)
 {
+  LOG_INFO("Registering BT plugin nodes from nav2_ws/src/navigation2/nav2_behavior_tree/plugins/action/assisted_teleop_action.cpp");
   BT::NodeBuilder builder =
     [](const std::string & name, const BT::NodeConfiguration & config)
     {

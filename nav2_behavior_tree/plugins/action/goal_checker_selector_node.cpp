@@ -22,6 +22,8 @@
 
 #include "rclcpp/rclcpp.hpp"
 
+#include "spdlog_wrapper.hpp"
+
 namespace nav2_behavior_tree
 {
 
@@ -32,6 +34,7 @@ GoalCheckerSelector::GoalCheckerSelector(
   const BT::NodeConfiguration & conf)
 : BT::SyncActionNode(name, conf)
 {
+  LOG_TRACE("BT plugin function entry: GoalCheckerSelector::GoalCheckerSelector");
   node_ = config().blackboard->get<rclcpp::Node::SharedPtr>("node");
 
   getInput("topic_name", topic_name_);
@@ -45,6 +48,7 @@ GoalCheckerSelector::GoalCheckerSelector(
 
 BT::NodeStatus GoalCheckerSelector::tick()
 {
+  LOG_TRACE("BT plugin function entry: GoalCheckerSelector::tick");
   rclcpp::spin_some(node_);
 
   // This behavior always use the last selected goal checker received from the topic input.
@@ -70,6 +74,7 @@ BT::NodeStatus GoalCheckerSelector::tick()
 void
 GoalCheckerSelector::callbackGoalCheckerSelect(const std_msgs::msg::String::SharedPtr msg)
 {
+  LOG_TRACE("BT plugin function entry: GoalCheckerSelector::callbackGoalCheckerSelect");
   last_selected_goal_checker_ = msg->data;
 }
 
@@ -78,5 +83,6 @@ GoalCheckerSelector::callbackGoalCheckerSelect(const std_msgs::msg::String::Shar
 #include "behaviortree_cpp_v3/bt_factory.h"
 BT_REGISTER_NODES(factory)
 {
+  LOG_INFO("Registering BT plugin nodes from nav2_ws/src/navigation2/nav2_behavior_tree/plugins/action/goal_checker_selector_node.cpp");
   factory.registerNodeType<nav2_behavior_tree::GoalCheckerSelector>("GoalCheckerSelector");
 }

@@ -1,8 +1,8 @@
 
 <!--
   This BT has all the functionalities of navigate_to_pose_w_replanning_and_recovery.xml,
-  with an additional feature to cancel the control closer to the goal proximity and 
-  make the robot wait for a specific time, to see if the obstacle clears out before 
+  with an additional feature to cancel the control closer to the goal proximity and
+  make the robot wait for a specific time, to see if the obstacle clears out before
   navigating along a significantly longer path to reach the goal location.
 -->
 <root main_tree_to_execute="MainTree">
@@ -25,7 +25,7 @@
             </RetryUntilSuccessful>
           </PathLongerOnApproach>
           <RecoveryNode number_of_retries="1" name="FollowPath">
-            <FollowPath path="{path}" controller_id="FollowPath"/>
+            <FollowPath path="{path}" controller_id=""/>
             <ClearEntireCostmap name="ClearLocalCostmap-Context" service_name="local_costmap/clear_entirely_local_costmap"/>
           </RecoveryNode>
         </ReactiveSequence>
@@ -45,3 +45,17 @@
     </RecoveryNode>
   </BehaviorTree>
 </root>
+
+<!--
+中文说明：
+1. 这棵树在默认单目标导航基础上增加“接近目标时路径明显变长就先等待”的策略。
+2. 规划分支仍以 1Hz 执行 ComputePathToPose：读取 {goal}，输出 {path}，失败时清理
+   global_costmap 并重试。
+3. MonitorAndFollowPath 是 ReactiveSequence，会在控制过程中持续检查 PathLongerOnApproach。
+4. PathLongerOnApproach 使用 prox_len=3.0 和 length_factor=2.0：当机器人接近目标且新路径
+   长度显著变长时，认为目标附近可能被临时障碍物阻塞。
+5. 触发该条件后，CancelControl 取消当前 /follow_path 控制，Wait 等待 5 秒，给障碍物离开
+   的机会，然后重新进入规划与控制流程。
+6. FollowPath 仍消费 blackboard["path"] 并调用 /follow_path；控制失败时清理 local_costmap。
+7. 顶层恢复逻辑与默认树一致：目标更新优先，其次轮询清理代价地图、旋转、等待和后退。
+-->

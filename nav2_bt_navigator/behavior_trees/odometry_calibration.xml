@@ -18,3 +18,16 @@
     </Repeat>
   </BehaviorTree>
 </root>
+
+<!--
+中文说明：
+1. 这棵树不是常规导航树，而是用于里程计标定实验的固定运动脚本。
+2. Repeat num_cycles=3 表示整套正方形轨迹重复 3 次。
+3. 每个周期由 4 段 DriveOnHeading 和 4 次 Spin 组成：每段直行 2 米，每次旋转约 90 度。
+4. DriveOnHeading dist_to_travel=2.0、speed=0.2、time_allowance=12，表示以 0.2m/s 前进，
+   最多允许 12 秒完成 2 米直行。
+5. Spin spin_dist=1.570796 表示旋转约 pi/2 弧度；is_recovery="false" 表示该旋转是任务动作，
+   不是恢复动作。
+6. 该树不使用 {goal}、{path}、ComputePathToPose 或 FollowPath，不依赖全局规划器；
+   它直接通过 behavior_server 的 DriveOnHeading 和 Spin action 驱动机器人走正方形。
+-->

@@ -20,9 +20,12 @@
 int main(int argc, char ** argv)
 {
   rclcpp::init(argc, argv);
+  SpdlogWrapper::init("nav2_controller", "controller_server"); // 模块名 + 日志文件名
   auto node = std::make_shared<nav2_controller::ControllerServer>();
   rclcpp::spin(node->get_node_base_interface());
   rclcpp::shutdown();
+
+  SpdlogWrapper::shutdown();
 
   return 0;
 }

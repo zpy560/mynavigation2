@@ -28,6 +28,8 @@ namespace nav2_behavior_tree
 BehaviorTreeEngine::BehaviorTreeEngine(
   const std::vector<std::string> & plugin_libraries)
 {
+  // 中文注释：行为树工厂只负责注册节点类型；每个动态库会向 factory_
+  // 注册自己的 BT 节点，后续 XML 解析时按节点名实例化。
   BT::SharedLibrary loader;
   for (const auto & p : plugin_libraries) {
     factory_.registerFromPlugin(loader.getOSName(p));
@@ -44,6 +46,8 @@ BehaviorTreeEngine::run(
   rclcpp::WallRate loopRate(loopTimeout);
   BT::NodeStatus result = BT::NodeStatus::RUNNING;
 
+  // 中文注释：BT 主循环每次 tickRoot 推进一次决策树；action 节点内部再通过
+  // ROS action/service 调 planner、controller、recovery 等服务节点。
   // Loop until something happens with ROS or the node completes
   try {
     while (rclcpp::ok() && result == BT::NodeStatus::RUNNING) {
@@ -78,6 +82,8 @@ BehaviorTreeEngine::createTreeFromText(
   const std::string & xml_string,
   BT::Blackboard::Ptr blackboard)
 {
+  // 中文注释：blackboard 是行为树节点之间共享上下文的位置，
+  // 例如目标点、路径、TF buffer 和 action client 都会挂在这里。
   return factory_.createTreeFromText(xml_string, blackboard);
 }
 
@@ -100,6 +106,8 @@ BehaviorTreeEngine::haltAllActions(BT::TreeNode * root_node)
   // this halt signal should propagate through the entire tree.
   root_node->halt();
 
+  // 中文注释：取消导航时必须确保所有 RUNNING 节点都收到 halt，
+  // 否则底层 action 可能继续执行，导致导航状态和机器人运动不一致。
   // but, just in case...
   auto visitor = [](BT::TreeNode * node) {
       if (node->status() == BT::NodeStatus::RUNNING) {

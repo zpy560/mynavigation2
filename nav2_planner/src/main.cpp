@@ -21,9 +21,11 @@
 int main(int argc, char ** argv)
 {
   rclcpp::init(argc, argv);
+  SpdlogWrapper::init("nav2_planner", "planner_server"); // 模块名 + 日志文件名
   auto node = std::make_shared<nav2_planner::PlannerServer>();
   rclcpp::spin(node->get_node_base_interface());
   rclcpp::shutdown();
+  SpdlogWrapper::shutdown();
 
   return 0;
 }

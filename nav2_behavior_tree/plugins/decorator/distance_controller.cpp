@@ -27,6 +27,8 @@
 
 #include "nav2_behavior_tree/plugins/decorator/distance_controller.hpp"
 
+#include "spdlog_wrapper.hpp"
+
 namespace nav2_behavior_tree
 {
 
@@ -39,6 +41,7 @@ DistanceController::DistanceController(
   robot_base_frame_("base_link"),
   first_time_(false)
 {
+  LOG_TRACE("BT plugin function entry: DistanceController::DistanceController");
   getInput("distance", distance_);
   getInput("global_frame", global_frame_);
   getInput("robot_base_frame", robot_base_frame_);
@@ -50,6 +53,7 @@ DistanceController::DistanceController(
 
 inline BT::NodeStatus DistanceController::tick()
 {
+  LOG_TRACE("BT plugin function entry: DistanceController::tick");
   if (status() == BT::NodeStatus::IDLE) {
     // Reset the starting position since we're starting a new iteration of
     // the distance controller (moving from IDLE to RUNNING)
@@ -57,6 +61,7 @@ inline BT::NodeStatus DistanceController::tick()
         start_pose_, *tf_, global_frame_, robot_base_frame_,
         transform_tolerance_))
     {
+  LOG_TRACE("BT plugin function entry: nav2_util::getCurrentPose");
       RCLCPP_DEBUG(node_->get_logger(), "Current robot pose is not available.");
       return BT::NodeStatus::FAILURE;
     }
@@ -71,6 +76,7 @@ inline BT::NodeStatus DistanceController::tick()
       current_pose, *tf_, global_frame_, robot_base_frame_,
       transform_tolerance_))
   {
+  LOG_TRACE("BT plugin function entry: nav2_util::getCurrentPose");
     RCLCPP_DEBUG(node_->get_logger(), "Current robot pose is not available.");
     return BT::NodeStatus::FAILURE;
   }
@@ -97,6 +103,7 @@ inline BT::NodeStatus DistanceController::tick()
             start_pose_, *tf_, global_frame_, robot_base_frame_,
             transform_tolerance_))
         {
+  LOG_TRACE("BT plugin function entry: nav2_util::getCurrentPose");
           RCLCPP_DEBUG(node_->get_logger(), "Current robot pose is not available.");
           return BT::NodeStatus::FAILURE;
         }
@@ -116,5 +123,6 @@ inline BT::NodeStatus DistanceController::tick()
 #include "behaviortree_cpp_v3/bt_factory.h"
 BT_REGISTER_NODES(factory)
 {
+  LOG_INFO("Registering BT plugin nodes from nav2_ws/src/navigation2/nav2_behavior_tree/plugins/decorator/distance_controller.cpp");
   factory.registerNodeType<nav2_behavior_tree::DistanceController>("DistanceController");
 }

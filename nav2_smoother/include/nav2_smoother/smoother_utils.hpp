@@ -38,6 +38,7 @@ namespace smoother_utils
 /**
  * @class nav2_smoother::PathSegment
  * @brief A segment of a path in start/end indices
+  * 中文：由起止索引表示的路径片段。
  */
 struct PathSegment
 {
@@ -56,8 +57,10 @@ inline std::vector<PathSegment> findDirectionalPathSegments(
   curr_segment.start = 0;
 
   // Iterating through the path to determine the position of the cusp
+  // 中文：遍历路径以确定尖点位置。
   for (unsigned int idx = 1; idx < path.poses.size() - 1; ++idx) {
     // We have two vectors for the dot product OA and AB. Determining the vectors.
+    // 中文：使用 OA 和 AB 两个向量计算点积；先确定这两个向量。
     double oa_x = path.poses[idx].pose.position.x -
       path.poses[idx - 1].pose.position.x;
     double oa_y = path.poses[idx].pose.position.y -
@@ -68,6 +71,7 @@ inline std::vector<PathSegment> findDirectionalPathSegments(
       path.poses[idx].pose.position.y;
 
     // Checking for the existance of cusp, in the path, using the dot product.
+    // 中文：使用点积检查路径中是否存在尖点。
     double dot_product = (oa_x * ab_x) + (oa_y * ab_y);
     if (dot_product < 0.0) {
       curr_segment.end = idx;
@@ -76,6 +80,7 @@ inline std::vector<PathSegment> findDirectionalPathSegments(
     }
 
     // Checking for the existance of a differential rotation in place.
+    // 中文：检查是否存在原地差速旋转。
     double cur_theta = tf2::getYaw(path.poses[idx].pose.orientation);
     double next_theta = tf2::getYaw(path.poses[idx + 1].pose.orientation);
     double dtheta = angles::shortest_angular_distance(cur_theta, next_theta);
@@ -99,6 +104,7 @@ inline void updateApproximatePathOrientations(
   reversing_segment = false;
 
   // Find if this path segment is in reverse
+  // 中文：判断该路径片段是否为倒车。
   dx = path.poses[2].pose.position.x - path.poses[1].pose.position.x;
   dy = path.poses[2].pose.position.y - path.poses[1].pose.position.y;
   theta = atan2(dy, dx);
@@ -108,17 +114,20 @@ inline void updateApproximatePathOrientations(
   }
 
   // Find the angle relative the path position vectors
+  // 中文：根据路径位置向量计算相对角度。
   for (unsigned int i = 0; i != path.poses.size() - 1; i++) {
     dx = path.poses[i + 1].pose.position.x - path.poses[i].pose.position.x;
     dy = path.poses[i + 1].pose.position.y - path.poses[i].pose.position.y;
     theta = atan2(dy, dx);
 
     // If points are overlapping, pass
+    // 中文：如果点重叠，则跳过。
     if (fabs(dx) < 1e-4 && fabs(dy) < 1e-4) {
       continue;
     }
 
     // Flip the angle if this path segment is in reverse
+    // 中文：如果该路径片段为倒车，则翻转角度。
     if (reversing_segment) {
       theta += M_PI;  // orientationAroundZAxis will normalize
     }

@@ -17,6 +17,8 @@
 
 #include "nav2_behavior_tree/plugins/action/spin_action.hpp"
 
+#include "spdlog_wrapper.hpp"
+
 namespace nav2_behavior_tree
 {
 
@@ -37,6 +39,7 @@ SpinAction::SpinAction(
 
 void SpinAction::on_tick()
 {
+  LOG_TRACE("BT plugin function entry: SpinAction::on_tick");
   if (is_recovery_) {
     increment_recovery_count();
   }
@@ -47,6 +50,7 @@ void SpinAction::on_tick()
 #include "behaviortree_cpp_v3/bt_factory.h"
 BT_REGISTER_NODES(factory)
 {
+  LOG_INFO("Registering BT plugin nodes from nav2_ws/src/navigation2/nav2_behavior_tree/plugins/action/spin_action.cpp");
   BT::NodeBuilder builder =
     [](const std::string & name, const BT::NodeConfiguration & config)
     {

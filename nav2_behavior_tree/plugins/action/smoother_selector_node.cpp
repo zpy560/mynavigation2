@@ -23,6 +23,8 @@
 
 #include "rclcpp/rclcpp.hpp"
 
+#include "spdlog_wrapper.hpp"
+
 namespace nav2_behavior_tree
 {
 
@@ -33,6 +35,7 @@ SmootherSelector::SmootherSelector(
   const BT::NodeConfiguration & conf)
 : BT::SyncActionNode(name, conf)
 {
+  LOG_TRACE("BT plugin function entry: SmootherSelector::SmootherSelector");
   node_ = config().blackboard->get<rclcpp::Node::SharedPtr>("node");
   callback_group_ = node_->create_callback_group(
     rclcpp::CallbackGroupType::MutuallyExclusive,
@@ -55,6 +58,7 @@ SmootherSelector::SmootherSelector(
 
 BT::NodeStatus SmootherSelector::tick()
 {
+  LOG_TRACE("BT plugin function entry: SmootherSelector::tick");
   callback_group_executor_.spin_some();
 
   // This behavior always use the last selected smoother received from the topic input.
@@ -80,6 +84,7 @@ BT::NodeStatus SmootherSelector::tick()
 void
 SmootherSelector::callbackSmootherSelect(const std_msgs::msg::String::SharedPtr msg)
 {
+  LOG_TRACE("BT plugin function entry: SmootherSelector::callbackSmootherSelect");
   last_selected_smoother_ = msg->data;
 }
 
@@ -88,5 +93,6 @@ SmootherSelector::callbackSmootherSelect(const std_msgs::msg::String::SharedPtr 
 #include "behaviortree_cpp_v3/bt_factory.h"
 BT_REGISTER_NODES(factory)
 {
+  LOG_INFO("Registering BT plugin nodes from nav2_ws/src/navigation2/nav2_behavior_tree/plugins/action/smoother_selector_node.cpp");
   factory.registerNodeType<nav2_behavior_tree::SmootherSelector>("SmootherSelector");
 }

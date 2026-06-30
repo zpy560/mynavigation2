@@ -17,6 +17,8 @@
 
 #include "nav2_behavior_tree/plugins/decorator/rate_controller.hpp"
 
+#include "spdlog_wrapper.hpp"
+
 namespace nav2_behavior_tree
 {
 
@@ -26,6 +28,7 @@ RateController::RateController(
 : BT::DecoratorNode(name, conf),
   first_time_(false)
 {
+  LOG_TRACE("BT plugin function entry: RateController::RateController");
   double hz = 1.0;
   getInput("hz", hz);
   period_ = 1.0 / hz;
@@ -33,6 +36,7 @@ RateController::RateController(
 
 BT::NodeStatus RateController::tick()
 {
+  LOG_TRACE("BT plugin function entry: RateController::tick");
   if (status() == BT::NodeStatus::IDLE) {
     // Reset the starting point since we're starting a new iteration of
     // the rate controller (moving from IDLE to RUNNING)
@@ -81,5 +85,6 @@ BT::NodeStatus RateController::tick()
 #include "behaviortree_cpp_v3/bt_factory.h"
 BT_REGISTER_NODES(factory)
 {
+  LOG_INFO("Registering BT plugin nodes from nav2_ws/src/navigation2/nav2_behavior_tree/plugins/decorator/rate_controller.cpp");
   factory.registerNodeType<nav2_behavior_tree::RateController>("RateController");
 }

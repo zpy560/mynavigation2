@@ -47,6 +47,7 @@
 #include "nav2_costmap_2d/footprint.hpp"
 #include "pluginlib/class_list_macros.hpp"
 #include "rclcpp/parameter_events_filter.hpp"
+#include "spdlog_wrapper.hpp"
 
 PLUGINLIB_EXPORT_CLASS(nav2_costmap_2d::InflationLayer, nav2_costmap_2d::Layer)
 
@@ -114,6 +115,10 @@ InflationLayer::onInitialize()
   cached_costs_.clear();
   need_reinflation_ = false;
   cell_inflation_radius_ = cellDistance(inflation_radius_);
+  LOG_INFO(
+    "InflationLayer '{}' initialized enabled={}, inflation_radius={}, cost_scaling_factor={}, inflate_unknown={}, inflate_around_unknown={}, cell_inflation_radius={}",
+    name_.c_str(), enabled_, inflation_radius_, cost_scaling_factor_, inflate_unknown_,
+    inflate_around_unknown_, cell_inflation_radius_);
   matchSize();
 }
 
@@ -126,6 +131,10 @@ InflationLayer::matchSize()
   cell_inflation_radius_ = cellDistance(inflation_radius_);
   computeCaches();
   seen_ = std::vector<bool>(costmap->getSizeInCellsX() * costmap->getSizeInCellsY(), false);
+  LOG_INFO(
+    "InflationLayer '{}' matched costmap size_x={}, size_y={}, resolution={}, inflation_radius={}, cell_inflation_radius={}",
+    name_.c_str(), costmap->getSizeInCellsX(), costmap->getSizeInCellsY(), resolution_,
+    inflation_radius_, cell_inflation_radius_);
 }
 
 void
@@ -194,6 +203,9 @@ InflationLayer::updateCosts(
 {
   std::lock_guard<Costmap2D::mutex_t> guard(*getMutex());
   if (!enabled_ || (cell_inflation_radius_ == 0)) {
+    LOG_INFO(
+      "InflationLayer '{}' skipped update enabled={}, cell_inflation_radius={}",
+      name_.c_str(), enabled_, cell_inflation_radius_);
     return;
   }
 
@@ -240,16 +252,20 @@ InflationLayer::updateCosts(
 
   // Start with lethal obstacles: by definition distance is 0.0
   auto & obs_bin = inflation_cells_[0];
+  std::size_t obstacle_seed_count = 0;
   for (int j = min_j; j < max_j; j++) {
     for (int i = min_i; i < max_i; i++) {
       int index = static_cast<int>(master_grid.getIndex(i, j));
       unsigned char cost = master_array[index];
       if (cost == LETHAL_OBSTACLE || (inflate_around_unknown_ && cost == NO_INFORMATION)) {
         obs_bin.emplace_back(index, i, j, i, j);
+        ++obstacle_seed_count;
       }
     }
   }
 
+  std::size_t visited_cell_count = 0;
+  std::size_t written_cell_count = 0;
   // Process cells by increasing distance; new cells are appended to the
   // corresponding distance bin, so they
   // can overtake previously inserted but farther away cells
@@ -266,6 +282,7 @@ InflationLayer::updateCosts(
       }
 
       seen_[index] = true;
+      ++visited_cell_count;
 
       unsigned int mx = dist_bin[i].x_;
       unsigned int my = dist_bin[i].y_;
@@ -287,8 +304,13 @@ InflationLayer::updateCosts(
           (inflate_unknown_ ? (cost > FREE_SPACE) : (cost >= INSCRIBED_INFLATED_OBSTACLE)))
         {
           master_array[index] = cost;
+          ++written_cell_count;
         } else {
-          master_array[index] = std::max(old_cost, cost);
+          const unsigned char new_cost = std::max(old_cost, cost);
+          if (new_cost != old_cost) {
+            ++written_cell_count;
+          }
+          master_array[index] = new_cost;
         }
       }
 
@@ -314,6 +336,11 @@ InflationLayer::updateCosts(
   }
 
   current_ = true;
+  LOG_INFO(
+    "InflationLayer '{}' updateCosts bounds=({}, {})-({}, {}), expanded_bounds=({}, {})-({}, {}), seeds={}, visited={}, written={}, inflation_radius={}, cost_scaling_factor={}, resolution={}",
+    name_.c_str(), base_min_i, base_min_j, base_max_i, base_max_j, min_i, min_j, max_i, max_j,
+    obstacle_seed_count, visited_cell_count, written_cell_count, inflation_radius_,
+    cost_scaling_factor_, resolution_);
 }
 
 /**
@@ -385,6 +412,10 @@ InflationLayer::computeCaches()
   for (auto & dist : inflation_cells_) {
     dist.reserve(200);
   }
+  LOG_INFO(
+    "InflationLayer '{}' computed caches cache_length={}, cached_cell_inflation_radius={}, max_distance_bin={}, cost_scaling_factor={}",
+    name_.c_str(), cache_length_, cached_cell_inflation_radius_, max_dist,
+    cost_scaling_factor_);
 }
 
 int
@@ -448,29 +479,44 @@ InflationLayer::dynamicParametersCallback(
       if (param_name == name_ + "." + "inflation_radius" &&
         inflation_radius_ != parameter.as_double())
       {
+        LOG_INFO(
+          "InflationLayer '{}' parameter inflation_radius changed {} -> {}",
+          name_.c_str(), inflation_radius_, parameter.as_double());
         inflation_radius_ = parameter.as_double();
         need_reinflation_ = true;
         need_cache_recompute = true;
       } else if (param_name == name_ + "." + "cost_scaling_factor" && // NOLINT
         cost_scaling_factor_ != parameter.as_double())
       {
+        LOG_INFO(
+          "InflationLayer '{}' parameter cost_scaling_factor changed {} -> {}",
+          name_.c_str(), cost_scaling_factor_, parameter.as_double());
         cost_scaling_factor_ = parameter.as_double();
         need_reinflation_ = true;
         need_cache_recompute = true;
       }
     } else if (param_type == ParameterType::PARAMETER_BOOL) {
       if (param_name == name_ + "." + "enabled" && enabled_ != parameter.as_bool()) {
+        LOG_INFO(
+          "InflationLayer '{}' parameter enabled changed {} -> {}",
+          name_.c_str(), enabled_, parameter.as_bool());
         enabled_ = parameter.as_bool();
         need_reinflation_ = true;
         current_ = false;
       } else if (param_name == name_ + "." + "inflate_unknown" && // NOLINT
         inflate_unknown_ != parameter.as_bool())
       {
+        LOG_INFO(
+          "InflationLayer '{}' parameter inflate_unknown changed {} -> {}",
+          name_.c_str(), inflate_unknown_, parameter.as_bool());
         inflate_unknown_ = parameter.as_bool();
         need_reinflation_ = true;
       } else if (param_name == name_ + "." + "inflate_around_unknown" && // NOLINT
         inflate_around_unknown_ != parameter.as_bool())
       {
+        LOG_INFO(
+          "InflationLayer '{}' parameter inflate_around_unknown changed {} -> {}",
+          name_.c_str(), inflate_around_unknown_, parameter.as_bool());
         inflate_around_unknown_ = parameter.as_bool();
         need_reinflation_ = true;
       }

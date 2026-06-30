@@ -24,6 +24,7 @@
 #include "nav_msgs/msg/occupancy_grid.hpp"
 #include "nav_msgs/srv/get_map.hpp"
 #include "nav2_msgs/srv/load_map.hpp"
+#include "spdlog_wrapper.hpp"
 
 namespace nav2_map_server
 {

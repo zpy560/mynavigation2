@@ -21,6 +21,7 @@
   <build_depend>bondcpp</build_depend>
   <build_depend>nav2_common</build_depend>
   <build_depend>diagnostic_updater</build_depend>
+  <build_depend>spdlog_wrapper</build_depend>
 
   <exec_depend>geometry_msgs</exec_depend>
   <exec_depend>lifecycle_msgs</exec_depend>
@@ -33,6 +34,7 @@
   <exec_depend>bondcpp</exec_depend>
   <exec_depend>tf2_geometry_msgs</exec_depend>
   <exec_depend>diagnostic_updater</exec_depend>
+  <exec_depend>spdlog_wrapper</exec_depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

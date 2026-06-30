@@ -15,6 +15,8 @@
 #include <string>
 #include "nav2_behavior_tree/plugins/action/reinitialize_global_localization_service.hpp"
 
+#include "spdlog_wrapper.hpp"
+
 namespace nav2_behavior_tree
 {
 
@@ -29,6 +31,7 @@ ReinitializeGlobalLocalizationService::ReinitializeGlobalLocalizationService(
 #include "behaviortree_cpp_v3/bt_factory.h"
 BT_REGISTER_NODES(factory)
 {
+  LOG_INFO("Registering BT plugin nodes from nav2_ws/src/navigation2/nav2_behavior_tree/plugins/action/reinitialize_global_localization_service.cpp");
   factory.registerNodeType<nav2_behavior_tree::ReinitializeGlobalLocalizationService>(
     "ReinitializeGlobalLocalization");
 }

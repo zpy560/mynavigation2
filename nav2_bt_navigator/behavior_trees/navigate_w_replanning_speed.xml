@@ -8,7 +8,17 @@
       <SpeedController min_rate="0.1" max_rate="1.0" min_speed="0.0" max_speed="0.26">
         <ComputePathToPose goal="{goal}" path="{path}" planner_id="GridBased"/>
       </SpeedController>
-      <FollowPath path="{path}"  controller_id="FollowPath"/>
+      <FollowPath path="{path}"  controller_id=""/>
     </PipelineSequence>
   </BehaviorTree>
 </root>
+
+<!--
+中文说明：
+1. 这是按机器人速度自适应调整重规划频率的最小导航树，不包含恢复逻辑。
+2. SpeedController 根据当前速度在 min_rate=0.1Hz 到 max_rate=1.0Hz 之间调整 ComputePathToPose
+   的 tick 频率；速度范围由 min_speed=0.0 和 max_speed=0.26 描述。
+3. 低速时降低规划频率，高速时提高规划频率，以在算力消耗和路径新鲜度之间折中。
+4. ComputePathToPose 输出 {path}，FollowPath 消费 {path} 并调用 controller_server 跟踪路径。
+5. 因为没有 RecoveryNode，规划或控制失败不会触发清图、旋转、等待、后退等恢复动作。
+-->

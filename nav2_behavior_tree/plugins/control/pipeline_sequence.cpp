@@ -18,12 +18,15 @@
 
 #include "nav2_behavior_tree/plugins/control/pipeline_sequence.hpp"
 
+#include "spdlog_wrapper.hpp"
+
 namespace nav2_behavior_tree
 {
 
 PipelineSequence::PipelineSequence(const std::string & name)
 : BT::ControlNode(name, {})
 {
+  LOG_TRACE("BT plugin function entry: PipelineSequence::PipelineSequence");
 }
 
 PipelineSequence::PipelineSequence(
@@ -31,10 +34,12 @@ PipelineSequence::PipelineSequence(
   const BT::NodeConfiguration & config)
 : BT::ControlNode(name, config)
 {
+  LOG_TRACE("BT plugin function entry: PipelineSequence::PipelineSequence");
 }
 
 BT::NodeStatus PipelineSequence::tick()
 {
+  LOG_TRACE("BT plugin function entry: PipelineSequence::tick");
   for (std::size_t i = 0; i < children_nodes_.size(); ++i) {
     auto status = children_nodes_[i]->executeTick();
     switch (status) {
@@ -68,6 +73,7 @@ BT::NodeStatus PipelineSequence::tick()
 
 void PipelineSequence::halt()
 {
+  LOG_TRACE("BT plugin function entry: PipelineSequence::halt");
   BT::ControlNode::halt();
   last_child_ticked_ = 0;
 }
@@ -76,5 +82,6 @@ void PipelineSequence::halt()
 
 BT_REGISTER_NODES(factory)
 {
+  LOG_INFO("Registering BT plugin nodes from nav2_ws/src/navigation2/nav2_behavior_tree/plugins/control/pipeline_sequence.cpp");
   factory.registerNodeType<nav2_behavior_tree::PipelineSequence>("PipelineSequence");
 }

@@ -9,10 +9,12 @@
 
   <buildtool_depend>ament_cmake</buildtool_depend>
   <build_depend>nav2_common</build_depend>
+  <build_depend>spdlog_wrapper</build_depend>
   <depend>rclcpp</depend>
   <depend>rclcpp_components</depend>
   <depend>geometry_msgs</depend>
   <depend>nav2_util</depend>
+  <exec_depend>spdlog_wrapper</exec_depend>
 
   <test_depend>ament_lint_common</test_depend>
   <test_depend>ament_lint_auto</test_depend>

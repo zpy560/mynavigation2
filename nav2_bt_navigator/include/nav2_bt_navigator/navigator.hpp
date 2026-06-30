@@ -46,6 +46,7 @@ struct FeedbackUtils
  * @class NavigatorMuxer
  * @brief A class to control the state of the BT navigator by allowing only a single
  * plugin to be processed at a time.
+  * 中文：插件。 to be processed at a time.
  */
 class NavigatorMuxer
 {
@@ -109,6 +110,7 @@ protected:
 /**
  * @class Navigator
  * @brief Navigator interface that acts as a base class for all BT-based Navigator action's plugins
+  * 中文：Navigator interface that acts as a base class for all BT-based Navigator action's 插件。s
  */
 template<class ActionT>
 class Navigator
@@ -132,11 +134,14 @@ public:
   /**
    * @brief Configuration to setup the navigator's backend BT and actions
    * @param parent_node The ROS parent node to utilize
+   * 中文：The ROS 父节点。 to utilize
    * @param plugin_lib_names a vector of plugin shared libraries to load
+   * 中文：a vector of 插件。 shared libraries to load
    * @param feedback_utils Some utilities useful for navigators to have
    * @param plugin_muxer The muxing object to ensure only one navigator
    * can be active at a time
    * @param odom_smoother Object to get current smoothed robot's speed
+   * 中文：用于获取机器人当前平滑速度的对象。
    * @return bool If successful
    */
   bool on_configure(
@@ -235,7 +240,9 @@ public:
 
   /**
    * @brief Get the action server
+   * 中文：Get the action server。
    * @return Action server pointer
+   * 中文：Action server。 pointer
    */
   std::unique_ptr<nav2_behavior_tree::BtActionServer<ActionT>> & getActionServer()
   {
@@ -278,25 +285,32 @@ protected:
 
   /**
    * @brief A callback to be called when a new goal is received by the BT action server
+   * 中文：BT action server 收到新目标时调用的回调。
    * Can be used to check if goal is valid and put values on
+   * 中文：可用于检查目标是否有效，并向 blackboard 写入值。
    * the blackboard which depend on the received goal
+   * 中文：这些 blackboard 值依赖收到的目标。
    */
   virtual bool goalReceived(typename ActionT::Goal::ConstSharedPtr goal) = 0;
 
   /**
    * @brief A callback that defines execution that happens on one iteration through the BT
+   * 中文：定义 BT 单次迭代执行内容的回调。
    * Can be used to publish action feedback
+   * 中文：可用于发布 action feedback。
    */
   virtual void onLoop() = 0;
 
   /**
    * @brief A callback that is called when a preempt is requested
+   * 中文：请求抢占时调用的回调。
    */
   virtual void onPreempt(typename ActionT::Goal::ConstSharedPtr goal) = 0;
 
   /**
    * @brief A callback that is called when a the action is completed; Can fill in
    * action result message or indicate that this action is done.
+   * 中文：action 结果消息或指示该 action 已完成。
    */
   virtual void goalCompleted(
     typename ActionT::Result::SharedPtr result,
@@ -314,6 +328,7 @@ protected:
 
   /**
    * @brief Method to cleanup resources.
+   * 中文：清理资源的方法。
    */
   virtual bool cleanup() {return true;}
 

@@ -20,6 +20,7 @@
 #include "pluginlib/class_list_macros.hpp"
 
 #include "nav2_util/node_utils.hpp"
+#include "spdlog_wrapper.hpp"
 
 namespace nav2_waypoint_follower
 {
@@ -59,12 +60,9 @@ void WaitAtWaypoint::initialize(
     is_enabled_);
   if (waypoint_pause_duration_ == 0) {
     is_enabled_ = false;
-    RCLCPP_INFO(
-      logger_,
-      "Waypoint pause duration is set to zero, disabling task executor plugin.");
+    LOG_INFO("Waypoint pause duration is set to zero, disabling task executor plugin.");
   } else if (!is_enabled_) {
-    RCLCPP_INFO(
-      logger_, "Waypoint task executor plugin is disabled.");
+    LOG_INFO("Waypoint task executor plugin is disabled.");
   }
 }
 
@@ -74,10 +72,7 @@ bool WaitAtWaypoint::processAtWaypoint(
   if (!is_enabled_) {
     return true;
   }
-  RCLCPP_INFO(
-    logger_, "Arrived at %i'th waypoint, sleeping for %i milliseconds",
-    curr_waypoint_index,
-    waypoint_pause_duration_);
+  LOG_INFO("Arrived at {}'th waypoint, sleeping for {} milliseconds", curr_waypoint_index, waypoint_pause_duration_);
   clock_->sleep_for(std::chrono::milliseconds(waypoint_pause_duration_));
   return true;
 }

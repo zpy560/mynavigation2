@@ -24,6 +24,7 @@
 #include "nav2_msgs/srv/save_map.hpp"
 
 #include "map_io.hpp"
+#include "spdlog_wrapper.hpp"
 
 namespace nav2_map_server
 {

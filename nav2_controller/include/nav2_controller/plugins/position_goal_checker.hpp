@@ -29,6 +29,7 @@ namespace nav2_controller
 /**
  * @class PositionGoalChecker
  * @brief Goal Checker plugin that only checks XY position, ignoring orientation
+  * 中文：只检查 XY 位置并忽略朝向的 GoalChecker 插件。
  */
 class PositionGoalChecker : public nav2_core::GoalChecker
 {
@@ -53,7 +54,9 @@ public:
 
   /**
    * @brief Set the XY goal tolerance
+   * 中文：设置 XY 目标容差。
    * @param tolerance New tolerance value
+   * 中文：新的容差值。
    */
   void setXYGoalTolerance(double tolerance);
 
@@ -67,7 +70,9 @@ protected:
 
   /**
   * @brief Callback executed when a parameter change is detected
+   * 中文：检测到参数变化时执行的回调。
   * @param parameters list of changed parameters
+   * 中文：已变化的参数列表。
   */
   rcl_interfaces::msg::SetParametersResult
   dynamicParametersCallback(std::vector<rclcpp::Parameter> parameters);

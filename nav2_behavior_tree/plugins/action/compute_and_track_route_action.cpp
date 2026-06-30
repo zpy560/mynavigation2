@@ -17,6 +17,8 @@
 
 #include "nav2_behavior_tree/plugins/action/compute_and_track_route_action.hpp"
 
+#include "spdlog_wrapper.hpp"
+
 namespace nav2_behavior_tree
 {
 
@@ -38,6 +40,7 @@ ComputeAndTrackRouteAction::ComputeAndTrackRouteAction(
 
 void ComputeAndTrackRouteAction::on_tick()
 {
+  LOG_TRACE("BT plugin function entry: ComputeAndTrackRouteAction::on_tick");
   bool use_poses = false, use_start = false;
   getInput("use_poses", use_poses);
   if (use_poses) {
@@ -60,6 +63,7 @@ void ComputeAndTrackRouteAction::on_tick()
 
 BT::NodeStatus ComputeAndTrackRouteAction::on_success()
 {
+  LOG_TRACE("BT plugin function entry: ComputeAndTrackRouteAction::on_success");
   resetFeedbackAndOutputPorts();
   setOutput("execution_duration", result_.result->execution_duration);
   return BT::NodeStatus::SUCCESS;
@@ -67,6 +71,7 @@ BT::NodeStatus ComputeAndTrackRouteAction::on_success()
 
 BT::NodeStatus ComputeAndTrackRouteAction::on_aborted()
 {
+  LOG_TRACE("BT plugin function entry: ComputeAndTrackRouteAction::on_aborted");
   resetFeedbackAndOutputPorts();
   setOutput("execution_duration", builtin_interfaces::msg::Duration());
   return BT::NodeStatus::FAILURE;
@@ -74,6 +79,7 @@ BT::NodeStatus ComputeAndTrackRouteAction::on_aborted()
 
 BT::NodeStatus ComputeAndTrackRouteAction::on_cancelled()
 {
+  LOG_TRACE("BT plugin function entry: ComputeAndTrackRouteAction::on_cancelled");
   resetFeedbackAndOutputPorts();
   // Set empty error code, action was cancelled
   setOutput("execution_duration", builtin_interfaces::msg::Duration());
@@ -142,6 +148,7 @@ void ComputeAndTrackRouteAction::on_wait_for_result(
 
 void ComputeAndTrackRouteAction::resetFeedbackAndOutputPorts()
 {
+  LOG_TRACE("BT plugin function entry: ComputeAndTrackRouteAction::resetFeedbackAndOutputPorts");
   nav_msgs::msg::Path empty_path;
   nav2_msgs::msg::Route empty_route;
   feedback_.last_node_id = 0;
@@ -163,6 +170,7 @@ void ComputeAndTrackRouteAction::resetFeedbackAndOutputPorts()
 #include "behaviortree_cpp_v3/bt_factory.h"
 BT_REGISTER_NODES(factory)
 {
+  LOG_INFO("Registering BT plugin nodes from nav2_ws/src/navigation2/nav2_behavior_tree/plugins/action/compute_and_track_route_action.cpp");
   BT::NodeBuilder builder =
     [](const std::string & name, const BT::NodeConfiguration & config)
     {

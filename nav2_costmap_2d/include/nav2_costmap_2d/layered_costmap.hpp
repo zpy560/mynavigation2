@@ -53,6 +53,10 @@ class Layer;
 /**
  * @class LayeredCostmap
  * @brief Instantiates different layer plugins and aggregates them into one score
+ * 中文：LayeredCostmap 是 costmap 数据融合核心。它按插件顺序执行
+ * updateBounds() 收集更新范围，再执行 updateCosts() 把 static / obstacle /
+ * inflation 等层融合到最终 master costmap；启用 filter 时先写 primary_costmap_，
+ * 再复制到 combined_costmap_ 并执行 filter 后处理。
  */
 class LayeredCostmap
 {
@@ -70,6 +74,8 @@ public:
   /**
    * @brief  Update the underlying costmap with new data.
    * If you want to update the map outside of the update loop that runs, you can call this.
+   * 中文：一次分层融合更新：滚动窗口跟随机器人 -> 各插件扩展更新边界
+   * -> 重置待更新窗口 -> 各插件写入代价值 -> 可选 filter 后处理。
    */
   void updateMap(double robot_x, double robot_y, double robot_yaw);
 

@@ -21,6 +21,8 @@
 #include "nav2_behavior_tree/plugins/decorator/goal_updated_controller.hpp"
 
 
+#include "spdlog_wrapper.hpp"
+
 namespace nav2_behavior_tree
 {
 
@@ -29,10 +31,12 @@ GoalUpdatedController::GoalUpdatedController(
   const BT::NodeConfiguration & conf)
 : BT::DecoratorNode(name, conf)
 {
+  LOG_TRACE("BT plugin function entry: GoalUpdatedController::GoalUpdatedController");
 }
 
 BT::NodeStatus GoalUpdatedController::tick()
 {
+  LOG_TRACE("BT plugin function entry: GoalUpdatedController::tick");
   if (status() == BT::NodeStatus::IDLE) {
     // Reset since we're starting a new iteration of
     // the goal updated controller (moving from IDLE to RUNNING)
@@ -84,5 +88,6 @@ BT::NodeStatus GoalUpdatedController::tick()
 #include "behaviortree_cpp_v3/bt_factory.h"
 BT_REGISTER_NODES(factory)
 {
+  LOG_INFO("Registering BT plugin nodes from nav2_ws/src/navigation2/nav2_behavior_tree/plugins/decorator/goal_updated_controller.cpp");
   factory.registerNodeType<nav2_behavior_tree::GoalUpdatedController>("GoalUpdatedController");
 }

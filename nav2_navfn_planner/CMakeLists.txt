@@ -17,6 +17,7 @@ find_package(builtin_interfaces REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(nav2_costmap_2d REQUIRED)
 find_package(pluginlib REQUIRED)
+find_package(spdlog_wrapper REQUIRED)
 
 nav2_package()
 
@@ -41,6 +42,7 @@ set(dependencies
   nav2_costmap_2d
   nav2_core
   pluginlib
+  spdlog_wrapper
 )
 
 add_library(${library_name} SHARED

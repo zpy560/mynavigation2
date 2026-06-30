@@ -32,8 +32,12 @@ WaypointFollower::WaypointFollower(const rclcpp::NodeOptions & options)
   waypoint_task_executor_loader_("nav2_waypoint_follower",
     "nav2_core::WaypointTaskExecutor")
 {
-  RCLCPP_INFO(get_logger(), "Creating");
+  // SpdlogWrapper::init("nav2_waypoint_follower", get_name());
+  LOG_INFO("Creating");
+  LOG_INFO("Waypoint follower sequences NavigateToPose goals and waypoint task plugins");
 
+  // 中文注释：WaypointFollower 不直接控制底盘；它把路点列表拆成多个
+  // NavigateToPose goal，逐个交给 bt_navigator，并在每个路点到达后执行任务plugin
   declare_parameter("stop_on_failure", true);
   declare_parameter("loop_rate", 20);
   nav2_util::declare_parameter_if_not_declared(
@@ -51,14 +55,20 @@ WaypointFollower::~WaypointFollower()
 nav2_util::CallbackReturn
 WaypointFollower::on_configure(const rclcpp_lifecycle::State & /*state*/)
 {
-  RCLCPP_INFO(get_logger(), "Configuring");
+  LOG_INFO("Configuring");
+  LOG_INFO("Configuring waypoint action server, NavigateToPose client and task executor");
 
   auto node = shared_from_this();
 
   stop_on_failure_ = get_parameter("stop_on_failure").as_bool();
   loop_rate_ = get_parameter("loop_rate").as_int();
   waypoint_task_executor_id_ = get_parameter("waypoint_task_executor_plugin").as_string();
+  LOG_INFO(
+    "Waypoint follower parameters stop_on_failure={}, loop_rate={}, task_executor={}",
+    stop_on_failure_, loop_rate_, waypoint_task_executor_id_.c_str());
 
+  // 中文注释：NavigateToPose action client 放在独立 callback group 中，
+  // 主循环可同步等待导航结果，同时不阻塞 follow_waypoints action server
   callback_group_ = create_callback_group(
     rclcpp::CallbackGroupType::MutuallyExclusive,
     false);
@@ -79,14 +89,14 @@ WaypointFollower::on_configure(const rclcpp_lifecycle::State & /*state*/)
     "follow_waypoints", std::bind(&WaypointFollower::followWaypoints, this));
 
   try {
+    // 中文注释：任务插件定义“到达路点后做什么”，默认 wait_at_waypoint；
+    // 例如等待、拍照、外部输入确认都走同一个 WaypointTaskExecutor 接口。
     waypoint_task_executor_type_ = nav2_util::get_plugin_type_param(
       this,
       waypoint_task_executor_id_);
     waypoint_task_executor_ = waypoint_task_executor_loader_.createUniqueInstance(
       waypoint_task_executor_type_);
-    RCLCPP_INFO(
-      get_logger(), "Created waypoint_task_executor : %s of type %s",
-      waypoint_task_executor_id_.c_str(), waypoint_task_executor_type_.c_str());
+    LOG_INFO("Created waypoint_task_executor : {} of type {}", waypoint_task_executor_id_.c_str(), waypoint_task_executor_type_.c_str());
     waypoint_task_executor_->initialize(node, waypoint_task_executor_id_);
   } catch (const pluginlib::PluginlibException & ex) {
     RCLCPP_FATAL(
@@ -100,16 +110,19 @@ WaypointFollower::on_configure(const rclcpp_lifecycle::State & /*state*/)
 nav2_util::CallbackReturn
 WaypointFollower::on_activate(const rclcpp_lifecycle::State & /*state*/)
 {
-  RCLCPP_INFO(get_logger(), "Activating");
+  LOG_INFO("Activating");
+  LOG_INFO("Activating waypoint follower action server");
 
   action_server_->activate();
 
   auto node = shared_from_this();
   // Add callback for dynamic parameters
+  // 中文：添加动态参数回调。
   dyn_params_handler_ = node->add_on_set_parameters_callback(
     std::bind(&WaypointFollower::dynamicParametersCallback, this, _1));
 
   // create bond connection
+  // 中文：创建 bond 连接。
   createBond();
 
   return nav2_util::CallbackReturn::SUCCESS;
@@ -118,12 +131,13 @@ WaypointFollower::on_activate(const rclcpp_lifecycle::State & /*state*/)
 nav2_util::CallbackReturn
 WaypointFollower::on_deactivate(const rclcpp_lifecycle::State & /*state*/)
 {
-  RCLCPP_INFO(get_logger(), "Deactivating");
+  LOG_INFO("Deactivating");
 
   action_server_->deactivate();
   dyn_params_handler_.reset();
 
   // destroy bond connection
+  // 中文：销毁 bond 连接。
   destroyBond();
 
   return nav2_util::CallbackReturn::SUCCESS;
@@ -132,7 +146,7 @@ WaypointFollower::on_deactivate(const rclcpp_lifecycle::State & /*state*/)
 nav2_util::CallbackReturn
 WaypointFollower::on_cleanup(const rclcpp_lifecycle::State & /*state*/)
 {
-  RCLCPP_INFO(get_logger(), "Cleaning up");
+  LOG_INFO("Cleaning up");
 
   action_server_.reset();
   nav_to_pose_client_.reset();
@@ -143,7 +157,7 @@ WaypointFollower::on_cleanup(const rclcpp_lifecycle::State & /*state*/)
 nav2_util::CallbackReturn
 WaypointFollower::on_shutdown(const rclcpp_lifecycle::State & /*state*/)
 {
-  RCLCPP_INFO(get_logger(), "Shutting down");
+  LOG_INFO("Shutting down");
   return nav2_util::CallbackReturn::SUCCESS;
 }
 
@@ -155,16 +169,16 @@ WaypointFollower::followWaypoints()
   auto result = std::make_shared<ActionT::Result>();
 
   // Check if request is valid
+  // 中文：检查请求是否有效。
   if (!action_server_ || !action_server_->is_server_active()) {
     RCLCPP_DEBUG(get_logger(), "Action server inactive. Stopping.");
     return;
   }
 
-  RCLCPP_INFO(
-    get_logger(), "Received follow waypoint request with %i waypoints.",
-    static_cast<int>(goal->poses.size()));
+  LOG_INFO("Received follow waypoint request with {} waypoints.", static_cast<int>(goal->poses.size()));
 
   if (goal->poses.size() == 0) {
+    LOG_INFO("FollowWaypoints request is empty, returning success immediately");
     action_server_->succeeded_current(result);
     return;
   }
@@ -175,29 +189,38 @@ WaypointFollower::followWaypoints()
 
   while (rclcpp::ok()) {
     // Check if asked to stop processing action
+    // 中文：检查是否请求停止处理 action。
     if (action_server_->is_cancel_requested()) {
       auto cancel_future = nav_to_pose_client_->async_cancel_all_goals();
       callback_group_executor_.spin_until_future_complete(cancel_future);
       // for result callback processing
+      // 中文：用于处理结果回调。
       callback_group_executor_.spin_some();
       action_server_->terminate_all();
       return;
     }
 
     // Check if asked to process another action
+    // 中文：检查是否请求处理另一个 action。
     if (action_server_->is_preempt_requested()) {
-      RCLCPP_INFO(get_logger(), "Preempting the goal pose.");
+      LOG_INFO("Preempting the goal pose.");
       goal = action_server_->accept_pending_goal();
       goal_index = 0;
       new_goal = true;
     }
 
     // Check if we need to send a new goal
+    // 中文：检查是否需要发送新的目标。
     if (new_goal) {
       new_goal = false;
       ClientT::Goal client_goal;
       client_goal.pose = goal->poses[goal_index];
+      LOG_INFO(
+        "Sending waypoint {} to NavigateToPose at ({:.3f}, {:.3f})",
+        goal_index, client_goal.pose.pose.position.x, client_goal.pose.pose.position.y);
 
+      // 中文注释：每个路点都复用 bt_navigator 的 NavigateToPose 能力；
+      // 本节点只根据返回状态决定继续、停止或记录 missed_waypoints。
       auto send_goal_options = rclcpp_action::Client<ClientT>::SendGoalOptions();
       send_goal_options.result_callback =
         std::bind(&WaypointFollower::resultCallback, this, std::placeholders::_1);
@@ -224,20 +247,16 @@ WaypointFollower::followWaypoints()
         failed_ids_.clear();
         return;
       } else {
-        RCLCPP_INFO(
-          get_logger(), "Failed to process waypoint %i,"
+        LOG_INFO("Failed to process waypoint {},"
           " moving to next.", goal_index);
       }
     } else if (current_goal_status_ == ActionStatus::SUCCEEDED) {
-      RCLCPP_INFO(
-        get_logger(), "Succeeded processing waypoint %i, processing waypoint task execution",
-        goal_index);
+      LOG_INFO("Succeeded processing waypoint {}, processing waypoint task execution", goal_index);
       bool is_task_executed = waypoint_task_executor_->processAtWaypoint(
         goal->poses[goal_index], goal_index);
-      RCLCPP_INFO(
-        get_logger(), "Task execution at waypoint %i %s", goal_index,
-        is_task_executed ? "succeeded" : "failed!");
+      LOG_INFO("Task execution at waypoint {} {}", goal_index, is_task_executed ? "succeeded" : "failed!");
       // if task execution was failed and stop_on_failure_ is on , terminate action
+      // 中文：如果任务执行失败且 stop_on_failure_ 开启，则终止 action。
       if (!is_task_executed && stop_on_failure_) {
         failed_ids_.push_back(goal_index);
         RCLCPP_WARN(
@@ -249,8 +268,7 @@ WaypointFollower::followWaypoints()
         failed_ids_.clear();
         return;
       } else {
-        RCLCPP_INFO(
-          get_logger(), "Handled task execution on waypoint %i,"
+        LOG_INFO("Handled task execution on waypoint {},"
           " moving to next.", goal_index);
       }
     }
@@ -259,22 +277,20 @@ WaypointFollower::followWaypoints()
       current_goal_status_ != ActionStatus::UNKNOWN)
     {
       // Update server state
+      // 中文：更新 server 状态。
       goal_index++;
       new_goal = true;
       if (goal_index >= goal->poses.size()) {
-        RCLCPP_INFO(
-          get_logger(), "Completed all %zu waypoints requested.",
-          goal->poses.size());
+        LOG_INFO("Completed all {} waypoints requested.", goal->poses.size());
         result->missed_waypoints = failed_ids_;
         action_server_->succeeded_current(result);
         failed_ids_.clear();
         return;
       }
     } else {
-      RCLCPP_INFO_EXPRESSION(
-        get_logger(),
-        (static_cast<int>(now().seconds()) % 30 == 0),
-        "Processing waypoint %i...", goal_index);
+      if (static_cast<int>(now().seconds()) % 30 == 0) {
+        LOG_INFO("Processing waypoint {}...", goal_index);
+      }
     }
 
     callback_group_executor_.spin_some();
@@ -296,12 +312,15 @@ WaypointFollower::resultCallback(
 
   switch (result.code) {
     case rclcpp_action::ResultCode::SUCCEEDED:
+      LOG_INFO("NavigateToPose result succeeded for current waypoint");
       current_goal_status_ = ActionStatus::SUCCEEDED;
       return;
     case rclcpp_action::ResultCode::ABORTED:
+      LOG_INFO("NavigateToPose result aborted for current waypoint");
       current_goal_status_ = ActionStatus::FAILED;
       return;
     case rclcpp_action::ResultCode::CANCELED:
+      LOG_INFO("NavigateToPose result canceled for current waypoint");
       current_goal_status_ = ActionStatus::FAILED;
       return;
     default:
@@ -326,6 +345,7 @@ rcl_interfaces::msg::SetParametersResult
 WaypointFollower::dynamicParametersCallback(std::vector<rclcpp::Parameter> parameters)
 {
   // No locking required as action server is running on same single threaded executor
+  // 中文：action server 运行在同一个单线程 executor 上，因此不需要加锁。
   rcl_interfaces::msg::SetParametersResult result;
 
   for (auto parameter : parameters) {
@@ -352,6 +372,9 @@ WaypointFollower::dynamicParametersCallback(std::vector<rclcpp::Parameter> param
 #include "rclcpp_components/register_node_macro.hpp"
 
 // Register the component with class_loader.
+// 中文：将组件注册到 class_loader。
 // This acts as a sort of entry point, allowing the component to be discoverable when its library
+// 中文：这相当于组件入口，使组件所在库被加载时可以被发现。
 // is being loaded into a running process.
+// 中文：当组件库被加载到运行中的进程时可被发现。
 RCLCPP_COMPONENTS_REGISTER_NODE(nav2_waypoint_follower::WaypointFollower)

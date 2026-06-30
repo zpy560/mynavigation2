@@ -44,20 +44,26 @@ namespace nav2_planner
 PlannerServer::PlannerServer(const rclcpp::NodeOptions & options)
 : nav2_util::LifecycleNode("planner_server", "", options),
   gp_loader_("nav2_core", "nav2_core::GlobalPlanner"),
-  default_ids_{"GridBased"},
-  default_types_{"nav2_navfn_planner/NavfnPlanner"},
+  default_ids_{"GridBased", "GridBasedAstar", "Smac2D", "SmacHybrid", "SmacLattice", "ThetaStar"},
+  default_types_{"nav2_navfn_planner/NavfnPlanner", "nav2_navfn_planner/NavfnPlanner", "nav2_smac_planner/SmacPlanner2D", "nav2_smac_planner/SmacPlannerHybrid", "nav2_smac_planner/SmacPlannerLattice", "nav2_theta_star_planner/ThetaStarPlanner"},
   costmap_(nullptr)
 {
-  RCLCPP_INFO(get_logger(), "Creating");
+  // SpdlogWrapper::init("nav2_planner", get_name());
+  LOG_INFO("Creating");
+  LOG_INFO("Planner server owns global_costmap and loads global planner plugins");
 
-  // Declare this node's parameters
+  // 中文注释：PlannerServer 只管理全局规划；具体算法由 planner_plugins 参数决定，
+  // 默认加载 NavfnPlanner，运行时通过 pluginlib 统一创建和生命周期管理。
+  // 声明该节点的parameters
   declare_parameter("planner_plugins", default_ids_);
+  declare_parameter("selected_planner", rclcpp::ParameterValue(std::string("")));
   declare_parameter("expected_planner_frequency", 1.0);
 
   get_parameter("planner_plugins", planner_ids_);
   if (planner_ids_ == default_ids_) {
     for (size_t i = 0; i < default_ids_.size(); ++i) {
       declare_parameter(default_ids_[i] + ".plugin", default_types_[i]);
+      LOG_INFO("default_ids_[i],{},default_types_[i],{}", default_ids_[i], default_types_[i]);
     }
   }
 
@@ -79,11 +85,14 @@ PlannerServer::~PlannerServer()
 nav2_util::CallbackReturn
 PlannerServer::on_configure(const rclcpp_lifecycle::State & /*state*/)
 {
-  RCLCPP_INFO(get_logger(), "Configuring");
+  LOG_INFO("Configuring");
+  LOG_INFO("Configuring planner plugins, global costmap and ComputePath action servers");
 
   costmap_ros_->configure();
   costmap_ = costmap_ros_->getCostmap();
 
+  // 中文注释：全局 costmap 是规划算法的环境输入；这里先完成 costmap 生命周期配置，
+  // 再把同一份 costmap_ros_ 传给每个全局规划plugin
   if (!costmap_ros_->getUseRadius()) {
     collision_checker_ =
       std::make_unique<nav2_costmap_2d::FootprintCollisionChecker<nav2_costmap_2d::Costmap2D *>>(
@@ -91,6 +100,7 @@ PlannerServer::on_configure(const rclcpp_lifecycle::State & /*state*/)
   }
 
   // Launch a thread to run the costmap node
+  // 中文：启动线程运行 costmap 节点。
   costmap_thread_ = std::make_unique<nav2_util::NodeThread>(costmap_ros_);
 
   RCLCPP_DEBUG(
@@ -103,15 +113,15 @@ PlannerServer::on_configure(const rclcpp_lifecycle::State & /*state*/)
 
   auto node = shared_from_this();
 
+  // 中文注释：每个 planner id 会映射到一个插件类型，例如 GridBased -> NavfnPlanner；
+  // 插件创建失败直接让生命周期配置失败，避免系统带着缺失规划器进入 active。
   for (size_t i = 0; i != planner_ids_.size(); i++) {
     try {
       planner_types_[i] = nav2_util::get_plugin_type_param(
         node, planner_ids_[i]);
       nav2_core::GlobalPlanner::Ptr planner =
         gp_loader_.createUniqueInstance(planner_types_[i]);
-      RCLCPP_INFO(
-        get_logger(), "Created global planner plugin %s of type %s",
-        planner_ids_[i].c_str(), planner_types_[i].c_str());
+      LOG_INFO("Created global planner plugin {} of type {}", planner_ids_[i].c_str(), planner_types_[i].c_str());
       planner->configure(node, planner_ids_[i], tf_, costmap_ros_);
       planners_.insert({planner_ids_[i], planner});
     } catch (const pluginlib::PluginlibException & ex) {
@@ -126,9 +136,18 @@ PlannerServer::on_configure(const rclcpp_lifecycle::State & /*state*/)
     planner_ids_concat_ += planner_ids_[i] + std::string(" ");
   }
 
-  RCLCPP_INFO(
-    get_logger(),
-    "Planner Server has %s planners available.", planner_ids_concat_.c_str());
+  LOG_INFO("Planner Server has {} planners available.", planner_ids_concat_.c_str());
+
+  get_parameter("selected_planner", selected_planner_id_);
+  if (!selected_planner_id_.empty()) {
+    if (planners_.find(selected_planner_id_) == planners_.end()) {
+      RCLCPP_WARN(
+        get_logger(), "Selected planner %s is not configured. Planner names are: %s",
+        selected_planner_id_.c_str(), planner_ids_concat_.c_str());
+    } else {
+      LOG_INFO("Planner server selected planner interface {}", selected_planner_id_.c_str());
+    }
+  }
 
   double expected_planner_frequency;
   get_parameter("expected_planner_frequency", expected_planner_frequency);
@@ -143,9 +162,13 @@ PlannerServer::on_configure(const rclcpp_lifecycle::State & /*state*/)
   }
 
   // Initialize pubs & subs
+  // 中文：初始化发布器和订阅器。
   plan_publisher_ = create_publisher<nav_msgs::msg::Path>("plan", 1);
 
+  // 中文注释：对外提供两个 action：单目标点规划和多目标点串联规划；
+  // BT Navigator 会通过这些 action 调用 planner server
   // Create the action servers for path planning to a pose and through poses
+  // 中文：Create the action server。s for path planning to a pose and through poses
   action_server_pose_ = std::make_unique<ActionServerToPose>(
     shared_from_this(),
     "compute_path_to_pose",
@@ -168,7 +191,8 @@ PlannerServer::on_configure(const rclcpp_lifecycle::State & /*state*/)
 nav2_util::CallbackReturn
 PlannerServer::on_activate(const rclcpp_lifecycle::State & /*state*/)
 {
-  RCLCPP_INFO(get_logger(), "Activating");
+  LOG_INFO("Activating");
+  LOG_INFO("Activating planner server action servers, publishers and planner plugins");
 
   plan_publisher_->on_activate();
   action_server_pose_->activate();
@@ -189,10 +213,12 @@ PlannerServer::on_activate(const rclcpp_lifecycle::State & /*state*/)
       std::placeholders::_1, std::placeholders::_2));
 
   // Add callback for dynamic parameters
+  // 中文：添加动态参数回调。
   dyn_params_handler_ = node->add_on_set_parameters_callback(
     std::bind(&PlannerServer::dynamicParametersCallback, this, _1));
 
   // create bond connection
+  // 中文：创建 bond 连接。
   createBond();
 
   return nav2_util::CallbackReturn::SUCCESS;
@@ -201,7 +227,7 @@ PlannerServer::on_activate(const rclcpp_lifecycle::State & /*state*/)
 nav2_util::CallbackReturn
 PlannerServer::on_deactivate(const rclcpp_lifecycle::State & /*state*/)
 {
-  RCLCPP_INFO(get_logger(), "Deactivating");
+  LOG_INFO("Deactivating");
 
   action_server_pose_->deactivate();
   action_server_poses_->deactivate();
@@ -209,10 +235,15 @@ PlannerServer::on_deactivate(const rclcpp_lifecycle::State & /*state*/)
 
   /*
    * The costmap is also a lifecycle node, so it may have already fired on_deactivate
+   * 中文：costmap 也是 lifecycle node，因此可能已经触发过 on_deactivate。
    * via rcl preshutdown cb. Despite the rclcpp docs saying on_shutdown callbacks fire
+   * 中文：这是通过 rcl preshutdown 回调触发的。尽管 rclcpp 文档说明 on_shutdown 回调会
    * in the order added, the preshutdown callbacks clearly don't per se, due to using an
+   * 中文：按添加顺序触发，但 preshutdown 回调显然并非如此，因为底层使用了
    * unordered_set iteration. Once this issue is resolved, we can maybe make a stronger
+   * 中文：unordered_set 迭代。该问题解决后，也许可以做出更强的
    * ordering assumption: https://github.com/ros2/rclcpp/issues/2096
+   * 中文：顺序假设：https://github.com/ros2/rclcpp/issues/2096
    */
   costmap_ros_->deactivate();
 
@@ -224,6 +255,7 @@ PlannerServer::on_deactivate(const rclcpp_lifecycle::State & /*state*/)
   dyn_params_handler_.reset();
 
   // destroy bond connection
+  // 中文：销毁 bond 连接。
   destroyBond();
 
   return nav2_util::CallbackReturn::SUCCESS;
@@ -232,7 +264,7 @@ PlannerServer::on_deactivate(const rclcpp_lifecycle::State & /*state*/)
 nav2_util::CallbackReturn
 PlannerServer::on_cleanup(const rclcpp_lifecycle::State & /*state*/)
 {
-  RCLCPP_INFO(get_logger(), "Cleaning up");
+  LOG_INFO("Cleaning up");
 
   action_server_pose_.reset();
   action_server_poses_.reset();
@@ -255,7 +287,7 @@ PlannerServer::on_cleanup(const rclcpp_lifecycle::State & /*state*/)
 nav2_util::CallbackReturn
 PlannerServer::on_shutdown(const rclcpp_lifecycle::State &)
 {
-  RCLCPP_INFO(get_logger(), "Shutting down");
+  LOG_INFO("Shutting down");
   return nav2_util::CallbackReturn::SUCCESS;
 }
 
@@ -285,7 +317,7 @@ bool PlannerServer::isCancelRequested(
   std::unique_ptr<nav2_util::SimpleActionServer<T>> & action_server)
 {
   if (action_server->is_cancel_requested()) {
-    RCLCPP_INFO(get_logger(), "Goal was canceled. Canceling planning action.");
+    LOG_INFO("Goal was canceled. Canceling planning action.");
     action_server->terminate_all();
     return true;
   }
@@ -370,6 +402,7 @@ PlannerServer::computePlanThroughPoses()
   auto start_time = this->now();
 
   // Initialize the ComputePathToPose goal and result
+  // 中文：Initialize the Compute生成的路径。ToPose goal and result
   auto goal = action_server_poses_->get_current_goal();
   auto result = std::make_shared<ActionThroughPoses::Result>();
   nav_msgs::msg::Path concat_path;
@@ -462,6 +495,7 @@ PlannerServer::computePlan()
   auto start_time = this->now();
 
   // Initialize the ComputePathToPose goal and result
+  // 中文：Initialize the Compute生成的路径。ToPose goal and result
   auto goal = action_server_pose_->get_current_goal();
   auto result = std::make_shared<ActionToPose::Result>();
 
@@ -526,19 +560,34 @@ PlannerServer::getPlan(
     "(%.2f, %.2f).", start.pose.position.x, start.pose.position.y,
     goal.pose.position.x, goal.pose.position.y);
 
-  if (planners_.find(planner_id) != planners_.end()) {
-    return planners_[planner_id]->createPlan(start, goal);
+  const std::string requested_planner_id = selected_planner_id_.empty() ?
+    planner_id : selected_planner_id_;
+
+  if (planners_.find(requested_planner_id) != planners_.end()) {
+    if (!selected_planner_id_.empty() && planner_id != selected_planner_id_) {
+      RCLCPP_WARN_ONCE(
+        get_logger(), "Action requested planner %s, but selected_planner is %s. "
+        "Using selected_planner from configuration.",
+        planner_id.c_str(), selected_planner_id_.c_str());
+    }
+    return planners_[requested_planner_id]->createPlan(start, goal);
   } else {
-    if (planners_.size() == 1 && planner_id.empty()) {
+    if (planners_.size() == 1 && requested_planner_id.empty()) {
       RCLCPP_WARN_ONCE(
         get_logger(), "No planners specified in action call. "
         "Server will use only plugin %s in server."
         " This warning will appear once.", planner_ids_concat_.c_str());
       return planners_[planners_.begin()->first]->createPlan(start, goal);
+    } else if (planners_.size() == 1) {
+      RCLCPP_WARN_ONCE(
+        get_logger(), "Requested planner %s is not configured. "
+        "Server will use only configured plugin %s instead."
+        " This warning will appear once.", requested_planner_id.c_str(), planner_ids_concat_.c_str());
+      return planners_[planners_.begin()->first]->createPlan(start, goal);
     } else {
       RCLCPP_ERROR(
         get_logger(), "planner %s is not a valid planner. "
-        "Planner names are: %s", planner_id.c_str(),
+        "Planner names are: %s", requested_planner_id.c_str(),
         planner_ids_concat_.c_str());
     }
   }
@@ -648,6 +697,17 @@ PlannerServer::dynamicParametersCallback(std::vector<rclcpp::Parameter> paramete
           max_planner_duration_ = 0.0;
         }
       }
+    } else if (type == ParameterType::PARAMETER_STRING) {
+      if (name == "selected_planner") {
+        const auto selected_planner = parameter.as_string();
+        if (!selected_planner.empty() && planners_.find(selected_planner) == planners_.end()) {
+          result.successful = false;
+          result.reason = "selected_planner is not configured";
+          return result;
+        }
+        selected_planner_id_ = selected_planner;
+        LOG_INFO("Planner server selected planner interface {}", selected_planner_id_.c_str());
+      }
     }
   }
 
@@ -660,6 +720,9 @@ PlannerServer::dynamicParametersCallback(std::vector<rclcpp::Parameter> paramete
 #include "rclcpp_components/register_node_macro.hpp"
 
 // Register the component with class_loader.
+// 中文：将组件注册到 class_loader。
 // This acts as a sort of entry point, allowing the component to be discoverable when its library
+// 中文：这相当于组件入口，使组件所在库被加载时可以被发现。
 // is being loaded into a running process.
+// 中文：当组件库被加载到运行中的进程时可被发现。
 RCLCPP_COMPONENTS_REGISTER_NODE(nav2_planner::PlannerServer)

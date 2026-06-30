@@ -39,17 +39,20 @@ namespace nav2_smoother
 /**
  * @class nav2_smoother::SimpleSmoother
  * @brief A path smoother implementation
+  * 中文：路径平滑器实现。
  */
 class SimpleSmoother : public nav2_core::Smoother
 {
 public:
   /**
    * @brief A constructor for nav2_smoother::SimpleSmoother
+   * 中文：nav2_smoother::SimpleSmoother 的构造函数。
    */
   SimpleSmoother() = default;
 
   /**
    * @brief A destructor for nav2_smoother::SimpleSmoother
+   * 中文：nav2_smoother::SimpleSmoother 的析构函数。
    */
   ~SimpleSmoother() override = default;
 
@@ -61,25 +64,32 @@ public:
 
   /**
    * @brief Method to cleanup resources.
+   * 中文：清理资源的方法。
    */
   void cleanup() override {costmap_sub_.reset();}
 
   /**
    * @brief Method to activate smoother and any threads involved in execution.
+   * 中文：激活 smoother 以及执行相关线程的方法。
    */
   void activate() override {}
 
   /**
    * @brief Method to deactivate smoother and any threads involved in execution.
+   * 中文：停用 smoother 以及执行相关线程的方法。
    */
   void deactivate() override {}
 
   /**
    * @brief Method to smooth given path
+   * 中文：平滑给定路径的方法。
    *
    * @param path In-out path to be smoothed
+   * 中文：输入输出参数：需要平滑的路径。
    * @param max_time Maximum duration smoothing should take
+   * 中文：路径平滑允许使用的最长时间。
    * @return If smoothing was completed (true) or interrupted by time limit (false)
+   * 中文：平滑完成返回 true，因时间限制中断返回 false。
    */
   bool smooth(
     nav_msgs::msg::Path & path,
@@ -88,11 +98,17 @@ public:
 protected:
   /**
    * @brief Smoother method - does the smoothing on a segment
+   * 中文：平滑器方法：对路径片段执行平滑。
    * @param path Reference to path
+   * 中文：路径引用。
    * @param reversing_segment Return if this is a reversing segment
+   * 中文：返回该片段是否为倒车片段。
    * @param costmap Pointer to minimal costmap
+   * 中文：最小 costmap 指针。
    * @param max_time Maximum time to compute, stop early if over limit
+   * 中文：最大计算时间，超限则提前停止。
    * @return If smoothing was successful
+   * 中文：平滑是否成功。
    */
   bool smoothImpl(
     nav_msgs::msg::Path & path,
@@ -102,9 +118,13 @@ protected:
 
   /**
    * @brief Get the field value for a given dimension
+   * 中文：获取指定维度的字段值。
    * @param msg Current pose to sample
+   * 中文：要采样的当前位姿。
    * @param dim Dimension ID of interest
+   * 中文：关注的维度 ID。
    * @return dim value
+   * 中文：维度值。
    */
   inline double getFieldByDim(
     const geometry_msgs::msg::PoseStamped & msg,
@@ -112,8 +132,11 @@ protected:
 
   /**
    * @brief Set the field value for a given dimension
+   * 中文：设置指定维度的字段值。
    * @param msg Current pose to sample
+   * 中文：要采样的当前位姿。
    * @param dim Dimension ID of interest
+   * 中文：关注的维度 ID。
    * @param value to set the dimention to for the pose
    */
   inline void setFieldByDim(

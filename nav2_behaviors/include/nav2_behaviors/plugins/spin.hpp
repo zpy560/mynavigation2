@@ -30,41 +30,50 @@ using SpinAction = nav2_msgs::action::Spin;
 /**
  * @class nav2_behaviors::Spin
  * @brief An action server behavior for spinning in
+  * 中文：用于原地旋转的 action server behavior。
  */
 class Spin : public TimedBehavior<SpinAction>
 {
 public:
   /**
    * @brief A constructor for nav2_behaviors::Spin
+   * 中文：nav2_behaviors::Spin 的构造函数。
    */
   Spin();
   ~Spin();
 
   /**
    * @brief Initialization to run behavior
+   * 中文：运行 behavior 前的初始化。
    * @param command Goal to execute
    * @return Status of behavior
+   * 中文：behavior 状态。
    */
   Status onRun(const std::shared_ptr<const SpinAction::Goal> command) override;
 
   /**
    * @brief Configuration of behavior action
+   * 中文：behavior action 配置。
    */
   void onConfigure() override;
 
   /**
    * @brief Loop function to run behavior
+   * 中文：运行 behavior 的循环函数。
    * @return Status of behavior
+   * 中文：behavior 状态。
    */
   Status onCycleUpdate() override;
 
 protected:
   /**
    * @brief Check if pose is collision free
+   * 中文：检查位姿是否无碰撞。
    * @param distance Distance to check forward
    * @param cmd_vel current commanded velocity
    * @param pose2d Current pose
    * @return is collision free or not
+   * 中文：是否无碰撞。
    */
   bool isCollisionFree(
     const double & distance,

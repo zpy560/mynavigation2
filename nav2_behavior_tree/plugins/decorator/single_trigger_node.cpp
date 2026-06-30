@@ -17,6 +17,8 @@
 
 #include "nav2_behavior_tree/plugins/decorator/single_trigger_node.hpp"
 
+#include "spdlog_wrapper.hpp"
+
 namespace nav2_behavior_tree
 {
 
@@ -26,10 +28,12 @@ SingleTrigger::SingleTrigger(
 : BT::DecoratorNode(name, conf),
   first_time_(true)
 {
+  LOG_TRACE("BT plugin function entry: SingleTrigger::SingleTrigger");
 }
 
 BT::NodeStatus SingleTrigger::tick()
 {
+  LOG_TRACE("BT plugin function entry: SingleTrigger::tick");
   if (status() == BT::NodeStatus::IDLE) {
     first_time_ = true;
   }
@@ -65,5 +69,6 @@ BT::NodeStatus SingleTrigger::tick()
 #include "behaviortree_cpp_v3/bt_factory.h"
 BT_REGISTER_NODES(factory)
 {
+  LOG_INFO("Registering BT plugin nodes from nav2_ws/src/navigation2/nav2_behavior_tree/plugins/decorator/single_trigger_node.cpp");
   factory.registerNodeType<nav2_behavior_tree::SingleTrigger>("SingleTrigger");
 }

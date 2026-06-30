@@ -31,6 +31,7 @@
 #include "nav2_util/lifecycle_node.hpp"
 #include "nav2_costmap_2d/costmap_2d_ros.hpp"
 #include "nav2_util/geometry_utils.hpp"
+#include "spdlog_wrapper.hpp"
 
 namespace nav2_navfn_planner
 {

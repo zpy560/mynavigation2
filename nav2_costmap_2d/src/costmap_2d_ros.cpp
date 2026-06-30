@@ -51,6 +51,7 @@
 #include "tf2_ros/create_timer_ros.h"
 #include "nav2_util/robot_utils.hpp"
 #include "rcl_interfaces/msg/set_parameters_result.hpp"
+#include "spdlog_wrapper.hpp"
 
 using namespace std::chrono_literals;
 using std::placeholders::_1;
@@ -73,6 +74,7 @@ Costmap2DROS::Costmap2DROS(const rclcpp::NodeOptions & options)
   is_lifecycle_follower_ = false;
 
   RCLCPP_INFO(get_logger(), "Creating Costmap");
+  LOG_INFO("Costmap2DROS '{}' created as standalone lifecycle node", name_.c_str());
 
   declare_parameter("always_send_full_costmap", rclcpp::ParameterValue(false));
   declare_parameter("footprint_padding", rclcpp::ParameterValue(0.01f));
@@ -125,6 +127,9 @@ Costmap2DROS::Costmap2DROS(
     "nav2_costmap_2d::InflationLayer"}
 {
   RCLCPP_INFO(get_logger(), "Creating Costmap");
+  LOG_INFO(
+    "Costmap2DROS '{}' created parent_namespace='{}', local_namespace='{}'",
+    name_.c_str(), parent_namespace_.c_str(), local_namespace.c_str());
 
   declare_parameter("always_send_full_costmap", rclcpp::ParameterValue(false));
   declare_parameter("footprint_padding", rclcpp::ParameterValue(0.01f));
@@ -163,7 +168,14 @@ Costmap2DROS::on_configure(const rclcpp_lifecycle::State & /*state*/)
 {
   RCLCPP_INFO(get_logger(), "Configuring");
   getParameters();
+  LOG_INFO(
+    "Costmap2DROS '{}' configuring data flow: global_frame='{}', robot_base_frame='{}', size={}x{}m, resolution={}, rolling_window={}, track_unknown_space={}, update_frequency={}, publish_frequency={}, plugins={}, filters={}",
+    name_.c_str(), global_frame_.c_str(), robot_base_frame_.c_str(), map_width_meters_,
+    map_height_meters_, resolution_, rolling_window_, track_unknown_space_,
+    map_update_frequency_, map_publish_frequency_, plugin_names_.size(), filter_names_.size());
 
+  // 中文注释：Costmap2DROS 是 costmap 的生命周期封装，内部的 LayeredCostmap
+  // 管理 static、obstacle、inflation 等插件层，并按顺序融合成最终代价地图。
   callback_group_ = create_callback_group(
     rclcpp::CallbackGroupType::MutuallyExclusive, false);
 
@@ -175,6 +187,11 @@ Costmap2DROS::on_configure(const rclcpp_lifecycle::State & /*state*/)
     layered_costmap_->resizeMap(
       (unsigned int)(map_width_meters_ / resolution_),
       (unsigned int)(map_height_meters_ / resolution_), resolution_, origin_x_, origin_y_);
+    LOG_INFO(
+      "Costmap2DROS '{}' resized master costmap cells={}x{}, origin=({}, {}), resolution={}",
+      name_.c_str(), static_cast<unsigned int>(map_width_meters_ / resolution_),
+      static_cast<unsigned int>(map_height_meters_ / resolution_), origin_x_, origin_y_,
+      resolution_);
   }
 
   // Create the transform-related objects
@@ -186,9 +203,14 @@ Costmap2DROS::on_configure(const rclcpp_lifecycle::State & /*state*/)
   tf_buffer_->setCreateTimerInterface(timer_interface);
   tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
 
+  // 中文注释：插件加载顺序会影响代价地图结果；通常先放静态地图/障碍物层，
+  // 最后放膨胀层，把障碍物周围扩展为规划器可感知的安全边界。
   // Then load and add the plug-ins to the costmap
   for (unsigned int i = 0; i < plugin_names_.size(); ++i) {
     RCLCPP_INFO(get_logger(), "Using plugin \"%s\"", plugin_names_[i].c_str());
+    LOG_INFO(
+      "Costmap2DROS '{}' loading layer plugin '{}' type='{}'",
+      name_.c_str(), plugin_names_[i].c_str(), plugin_types_[i].c_str());
 
     std::shared_ptr<Layer> plugin = plugin_loader_.createSharedInstance(plugin_types_[i]);
 
@@ -205,10 +227,18 @@ Costmap2DROS::on_configure(const rclcpp_lifecycle::State & /*state*/)
     lock.unlock();
 
     RCLCPP_INFO(get_logger(), "Initialized plugin \"%s\"", plugin_names_[i].c_str());
+    LOG_INFO(
+      "Costmap2DROS '{}' initialized layer plugin '{}'",
+      name_.c_str(), plugin_names_[i].c_str());
   }
   // and costmap filters as well
+  // 中文注释：filter 是 costmap 的后处理层，常用于 keepout zone、
+  // speed limit zone 等全局约束，不改变基础插件的数据来源。
   for (unsigned int i = 0; i < filter_names_.size(); ++i) {
     RCLCPP_INFO(get_logger(), "Using costmap filter \"%s\"", filter_names_[i].c_str());
+    LOG_INFO(
+      "Costmap2DROS '{}' loading costmap filter '{}' type='{}'",
+      name_.c_str(), filter_names_[i].c_str(), filter_types_[i].c_str());
 
     std::shared_ptr<Layer> filter = plugin_loader_.createSharedInstance(filter_types_[i]);
 
@@ -224,6 +254,9 @@ Costmap2DROS::on_configure(const rclcpp_lifecycle::State & /*state*/)
     lock.unlock();
 
     RCLCPP_INFO(get_logger(), "Initialized costmap filter \"%s\"", filter_names_[i].c_str());
+    LOG_INFO(
+      "Costmap2DROS '{}' initialized costmap filter '{}'",
+      name_.c_str(), filter_names_[i].c_str());
   }
 
   // Create the publishers and subscribers
@@ -239,6 +272,9 @@ Costmap2DROS::on_configure(const rclcpp_lifecycle::State & /*state*/)
     shared_from_this(),
     layered_costmap_->getCostmap(), global_frame_,
     "costmap", always_send_full_costmap_);
+  LOG_INFO(
+    "Costmap2DROS '{}' created publishers: costmap, costmap_raw, costmap_updates, always_send_full_costmap={}",
+    name_.c_str(), always_send_full_costmap_);
 
   // Set the footprint
   if (use_radius_) {
@@ -251,6 +287,7 @@ Costmap2DROS::on_configure(const rclcpp_lifecycle::State & /*state*/)
 
   // Add cleaning service
   clear_costmap_service_ = std::make_unique<ClearCostmapService>(shared_from_this(), *this);
+  LOG_INFO("Costmap2DROS '{}' configured clear costmap service", name_.c_str());
 
   executor_ = std::make_shared<rclcpp::executors::SingleThreadedExecutor>();
   executor_->add_callback_group(callback_group_, get_node_base_interface());
@@ -262,6 +299,7 @@ nav2_util::CallbackReturn
 Costmap2DROS::on_activate(const rclcpp_lifecycle::State & /*state*/)
 {
   RCLCPP_INFO(get_logger(), "Activating");
+  LOG_INFO("Costmap2DROS '{}' activating publishers and update loop", name_.c_str());
 
   costmap_publisher_->on_activate();
   footprint_pub_->on_activate();
@@ -272,6 +310,9 @@ Costmap2DROS::on_activate(const rclcpp_lifecycle::State & /*state*/)
   std::string tf_error;
 
   RCLCPP_INFO(get_logger(), "Checking transform");
+  LOG_INFO(
+    "Costmap2DROS '{}' waiting for transform {} -> {}",
+    name_.c_str(), robot_base_frame_.c_str(), global_frame_.c_str());
   rclcpp::Rate r(2);
   while (rclcpp::ok() &&
     !tf_buffer_->canTransform(
@@ -294,6 +335,9 @@ Costmap2DROS::on_activate(const rclcpp_lifecycle::State & /*state*/)
   map_update_thread_shutdown_ = false;
   map_update_thread_ = std::make_unique<std::thread>(
     std::bind(&Costmap2DROS::mapUpdateLoop, this, map_update_frequency_));
+  LOG_INFO(
+    "Costmap2DROS '{}' started map update thread frequency={}",
+    name_.c_str(), map_update_frequency_);
 
   start();
 
@@ -308,6 +352,7 @@ nav2_util::CallbackReturn
 Costmap2DROS::on_deactivate(const rclcpp_lifecycle::State & /*state*/)
 {
   RCLCPP_INFO(get_logger(), "Deactivating");
+  LOG_INFO("Costmap2DROS '{}' deactivating update loop and publishers", name_.c_str());
 
   dyn_params_handler.reset();
 
@@ -330,6 +375,7 @@ nav2_util::CallbackReturn
 Costmap2DROS::on_cleanup(const rclcpp_lifecycle::State & /*state*/)
 {
   RCLCPP_INFO(get_logger(), "Cleaning up");
+  LOG_INFO("Costmap2DROS '{}' cleaning up costmap resources", name_.c_str());
 
   layered_costmap_.reset();
 
@@ -350,6 +396,7 @@ nav2_util::CallbackReturn
 Costmap2DROS::on_shutdown(const rclcpp_lifecycle::State &)
 {
   RCLCPP_INFO(get_logger(), "Shutting down");
+  LOG_INFO("Costmap2DROS '{}' shutting down", name_.c_str());
   return nav2_util::CallbackReturn::SUCCESS;
 }
 
@@ -392,9 +439,15 @@ Costmap2DROS::getParameters()
   // 1. All plugins must have 'plugin' param defined in their namespace to define the plugin type
   for (size_t i = 0; i < plugin_names_.size(); ++i) {
     plugin_types_[i] = nav2_util::get_plugin_type_param(node, plugin_names_[i]);
+    LOG_INFO(
+      "Costmap2DROS '{}' parameter plugin '{}' type='{}'",
+      name_.c_str(), plugin_names_[i].c_str(), plugin_types_[i].c_str());
   }
   for (size_t i = 0; i < filter_names_.size(); ++i) {
     filter_types_[i] = nav2_util::get_plugin_type_param(node, filter_names_[i]);
+    LOG_INFO(
+      "Costmap2DROS '{}' parameter filter '{}' type='{}'",
+      name_.c_str(), filter_names_[i].c_str(), filter_types_[i].c_str());
   }
 
   // 2. The map publish frequency cannot be 0 (to avoid a divde-by-zero)
@@ -420,6 +473,11 @@ Costmap2DROS::getParameters()
         footprint_.c_str(), robot_radius_);
     }
   }
+  LOG_INFO(
+    "Costmap2DROS '{}' parameters loaded: global_frame='{}', robot_base_frame='{}', map={}x{}m, resolution={}, origin=({}, {}), robot_radius={}, use_radius={}, footprint_padding={}",
+    name_.c_str(), global_frame_.c_str(), robot_base_frame_.c_str(), map_width_meters_,
+    map_height_meters_, resolution_, origin_x_, origin_y_, robot_radius_, use_radius_,
+    footprint_padding_);
 }
 
 void
@@ -429,6 +487,9 @@ Costmap2DROS::setRobotFootprint(const std::vector<geometry_msgs::msg::Point> & p
   padded_footprint_ = points;
   padFootprint(padded_footprint_, footprint_padding_);
   layered_costmap_->setFootprint(padded_footprint_);
+  LOG_INFO(
+    "Costmap2DROS '{}' updated footprint points={}, padded_points={}, padding={}",
+    name_.c_str(), unpadded_footprint_.size(), padded_footprint_.size(), footprint_padding_);
 }
 
 void
@@ -456,9 +517,11 @@ void
 Costmap2DROS::mapUpdateLoop(double frequency)
 {
   RCLCPP_DEBUG(get_logger(), "mapUpdateLoop frequency: %lf", frequency);
+  LOG_INFO("Costmap2DROS '{}' entering mapUpdateLoop frequency={}", name_.c_str(), frequency);
 
   // the user might not want to run the loop every cycle
   if (frequency == 0.0) {
+    LOG_INFO("Costmap2DROS '{}' mapUpdateLoop disabled because frequency is 0", name_.c_str());
     return;
   }
 
@@ -480,6 +543,9 @@ Costmap2DROS::mapUpdateLoop(double frequency)
       timer.end();
 
       RCLCPP_DEBUG(get_logger(), "Map update time: %.9f", timer.elapsed_time_in_seconds());
+      LOG_INFO(
+        "Costmap2DROS '{}' update cycle elapsed={}s initialized={}",
+        name_.c_str(), timer.elapsed_time_in_seconds(), layered_costmap_->isInitialized());
       if (publish_cycle_ > rclcpp::Duration(0s) && layered_costmap_->isInitialized()) {
         unsigned int x0, y0, xn, yn;
         layered_costmap_->getBounds(&x0, &xn, &y0, &yn);
@@ -492,6 +558,7 @@ Costmap2DROS::mapUpdateLoop(double frequency)
           RCLCPP_DEBUG(get_logger(), "Publish costmap at %s", name_.c_str());
           costmap_publisher_->publishCostmap();
           last_publish_ = current_time;
+          LOG_INFO("Costmap2DROS '{}' published costmap cycle", name_.c_str());
         }
       }
     }
@@ -523,6 +590,9 @@ Costmap2DROS::updateMap()
       const double & x = pose.pose.position.x;
       const double & y = pose.pose.position.y;
       const double yaw = tf2::getYaw(pose.pose.orientation);
+      LOG_INFO(
+        "Costmap2DROS '{}' updateMap robot_pose=({}, {}, yaw={})",
+        name_.c_str(), x, y, yaw);
       layered_costmap_->updateMap(x, y, yaw);
 
       auto footprint = std::make_unique<geometry_msgs::msg::PolygonStamped>();
@@ -532,6 +602,11 @@ Costmap2DROS::updateMap()
       RCLCPP_DEBUG(get_logger(), "Publishing footprint");
       footprint_pub_->publish(std::move(footprint));
       initialized_ = true;
+      LOG_INFO("Costmap2DROS '{}' updateMap completed and footprint published", name_.c_str());
+    } else {
+      LOG_INFO(
+        "Costmap2DROS '{}' skipped updateMap because robot pose is unavailable",
+        name_.c_str());
     }
   }
 }
@@ -540,6 +615,7 @@ void
 Costmap2DROS::start()
 {
   RCLCPP_INFO(get_logger(), "start");
+  LOG_INFO("Costmap2DROS '{}' starting plugins and filters", name_.c_str());
   std::vector<std::shared_ptr<Layer>> * plugins = layered_costmap_->getPlugins();
   std::vector<std::shared_ptr<Layer>> * filters = layered_costmap_->getFilters();
 
@@ -593,6 +669,7 @@ Costmap2DROS::stop()
   }
   initialized_ = false;
   stopped_ = true;
+  LOG_INFO("Costmap2DROS '{}' stopped plugins and filters", name_.c_str());
 }
 
 void
@@ -600,12 +677,14 @@ Costmap2DROS::pause()
 {
   stop_updates_ = true;
   initialized_ = false;
+  LOG_INFO("Costmap2DROS '{}' paused updates", name_.c_str());
 }
 
 void
 Costmap2DROS::resume()
 {
   stop_updates_ = false;
+  LOG_INFO("Costmap2DROS '{}' resumed updates", name_.c_str());
 
   // block until the costmap is re-initialized.. meaning one update cycle has run
   rclcpp::Rate r(100.0);
@@ -619,6 +698,9 @@ Costmap2DROS::resetLayers()
 {
   Costmap2D * top = layered_costmap_->getCostmap();
   top->resetMap(0, 0, top->getSizeInCellsX(), top->getSizeInCellsY());
+  LOG_INFO(
+    "Costmap2DROS '{}' resetting all layers size_x={}, size_y={}",
+    name_.c_str(), top->getSizeInCellsX(), top->getSizeInCellsY());
 
   // Reset each of the plugins
   std::vector<std::shared_ptr<Layer>> * plugins = layered_costmap_->getPlugins();
@@ -671,19 +753,31 @@ Costmap2DROS::dynamicParametersCallback(std::vector<rclcpp::Parameter> parameter
 
     if (type == ParameterType::PARAMETER_DOUBLE) {
       if (name == "robot_radius") {
+        LOG_INFO(
+          "Costmap2DROS '{}' dynamic parameter robot_radius changed {} -> {}",
+          name_.c_str(), robot_radius_, parameter.as_double());
         robot_radius_ = parameter.as_double();
         // Set the footprint
         if (use_radius_) {
           setRobotFootprint(makeFootprintFromRadius(robot_radius_));
         }
       } else if (name == "footprint_padding") {
+        LOG_INFO(
+          "Costmap2DROS '{}' dynamic parameter footprint_padding changed {} -> {}",
+          name_.c_str(), footprint_padding_, parameter.as_double());
         footprint_padding_ = parameter.as_double();
         padded_footprint_ = unpadded_footprint_;
         padFootprint(padded_footprint_, footprint_padding_);
         layered_costmap_->setFootprint(padded_footprint_);
       } else if (name == "transform_tolerance") {
+        LOG_INFO(
+          "Costmap2DROS '{}' dynamic parameter transform_tolerance changed {} -> {}",
+          name_.c_str(), transform_tolerance_, parameter.as_double());
         transform_tolerance_ = parameter.as_double();
       } else if (name == "publish_frequency") {
+        LOG_INFO(
+          "Costmap2DROS '{}' dynamic parameter publish_frequency changed {} -> {}",
+          name_.c_str(), map_publish_frequency_, parameter.as_double());
         map_publish_frequency_ = parameter.as_double();
         if (map_publish_frequency_ > 0) {
           publish_cycle_ = rclcpp::Duration::from_seconds(1 / map_publish_frequency_);
@@ -691,18 +785,30 @@ Costmap2DROS::dynamicParametersCallback(std::vector<rclcpp::Parameter> parameter
           publish_cycle_ = rclcpp::Duration(-1s);
         }
       } else if (name == "resolution") {
+        LOG_INFO(
+          "Costmap2DROS '{}' dynamic parameter resolution changed {} -> {}",
+          name_.c_str(), resolution_, parameter.as_double());
         resize_map = true;
         resolution_ = parameter.as_double();
       } else if (name == "origin_x") {
+        LOG_INFO(
+          "Costmap2DROS '{}' dynamic parameter origin_x changed {} -> {}",
+          name_.c_str(), origin_x_, parameter.as_double());
         resize_map = true;
         origin_x_ = parameter.as_double();
       } else if (name == "origin_y") {
+        LOG_INFO(
+          "Costmap2DROS '{}' dynamic parameter origin_y changed {} -> {}",
+          name_.c_str(), origin_y_, parameter.as_double());
         resize_map = true;
         origin_y_ = parameter.as_double();
       }
     } else if (type == ParameterType::PARAMETER_INTEGER) {
       if (name == "width") {
         if (parameter.as_int() > 0) {
+          LOG_INFO(
+            "Costmap2DROS '{}' dynamic parameter width changed {} -> {}",
+            name_.c_str(), map_width_meters_, parameter.as_int());
           resize_map = true;
           map_width_meters_ = parameter.as_int();
         } else {
@@ -714,6 +820,9 @@ Costmap2DROS::dynamicParametersCallback(std::vector<rclcpp::Parameter> parameter
         }
       } else if (name == "height") {
         if (parameter.as_int() > 0) {
+          LOG_INFO(
+            "Costmap2DROS '{}' dynamic parameter height changed {} -> {}",
+            name_.c_str(), map_height_meters_, parameter.as_int());
           resize_map = true;
           map_height_meters_ = parameter.as_int();
         } else {
@@ -726,12 +835,16 @@ Costmap2DROS::dynamicParametersCallback(std::vector<rclcpp::Parameter> parameter
       }
     } else if (type == ParameterType::PARAMETER_STRING) {
       if (name == "footprint") {
+        LOG_INFO("Costmap2DROS '{}' dynamic parameter footprint changed", name_.c_str());
         footprint_ = parameter.as_string();
         std::vector<geometry_msgs::msg::Point> new_footprint;
         if (makeFootprintFromString(footprint_, new_footprint)) {
           setRobotFootprint(new_footprint);
         }
       } else if (name == "robot_base_frame") {
+        LOG_INFO(
+          "Costmap2DROS '{}' dynamic parameter robot_base_frame requested '{}'",
+          name_.c_str(), parameter.as_string().c_str());
         // First, make sure that the transform between the robot base frame
         // and the global frame is available
         std::string tf_error;
@@ -759,6 +872,11 @@ Costmap2DROS::dynamicParametersCallback(std::vector<rclcpp::Parameter> parameter
     layered_costmap_->resizeMap(
       (unsigned int)(map_width_meters_ / resolution_),
       (unsigned int)(map_height_meters_ / resolution_), resolution_, origin_x_, origin_y_);
+    LOG_INFO(
+      "Costmap2DROS '{}' resized map from dynamic parameters cells={}x{}, resolution={}, origin=({}, {})",
+      name_.c_str(), static_cast<unsigned int>(map_width_meters_ / resolution_),
+      static_cast<unsigned int>(map_height_meters_ / resolution_), resolution_, origin_x_,
+      origin_y_);
     updateMap();
   }
 

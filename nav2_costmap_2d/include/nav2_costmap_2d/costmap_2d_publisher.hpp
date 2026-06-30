@@ -59,6 +59,8 @@ namespace nav2_costmap_2d
 /**
  * @class Costmap2DPublisher
  * @brief A tool to periodically publish visualization data from a Costmap2D
+ * 中文：Costmap2DPublisher 是 costmap 数据流的输出端，负责把内部 0-255 master
+ * costmap 转换为 RViz 常用的 OccupancyGrid、Nav2 raw Costmap，以及局部增量更新。
  */
 class Costmap2DPublisher
 {
@@ -111,6 +113,7 @@ public:
   /** @brief Include the given bounds in the changed-rectangle. */
   void updateBounds(unsigned int x0, unsigned int xn, unsigned int y0, unsigned int yn)
   {
+    // 中文：累积本轮 LayeredCostmap 更新窗口，发布时决定发全图还是局部更新。
     x0_ = std::min(x0, x0_);
     xn_ = std::max(xn, xn_);
     y0_ = std::min(y0, y0_);

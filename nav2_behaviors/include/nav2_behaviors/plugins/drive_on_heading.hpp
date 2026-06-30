@@ -32,6 +32,7 @@ namespace nav2_behaviors
 /**
  * @class nav2_behaviors::DriveOnHeading
  * @brief An action server Behavior for spinning in
+  * 中文：用于沿指定方向运动的 action server Behavior。
  */
 template<typename ActionT = nav2_msgs::action::DriveOnHeading>
 class DriveOnHeading : public TimedBehavior<ActionT>
@@ -39,6 +40,7 @@ class DriveOnHeading : public TimedBehavior<ActionT>
 public:
   /**
    * @brief A constructor for nav2_behaviors::DriveOnHeading
+   * 中文：nav2_behaviors::DriveOnHeading 的构造函数。
    */
   DriveOnHeading()
   : TimedBehavior<ActionT>(),
@@ -53,19 +55,20 @@ public:
 
   /**
    * @brief Initialization to run behavior
+   * 中文：运行 behavior 前的初始化。
    * @param command Goal to execute
    * @return Status of behavior
+   * 中文：behavior 状态。
    */
   Status onRun(const std::shared_ptr<const typename ActionT::Goal> command) override
   {
     if (command->target.y != 0.0 || command->target.z != 0.0) {
-      RCLCPP_INFO(
-        this->logger_,
-        "DrivingOnHeading in Y and Z not supported, will only move in X.");
+      LOG_INFO("DrivingOnHeading in Y and Z not supported, will only move in X.");
       return Status::FAILED;
     }
 
     // Ensure that both the speed and direction have the same sign
+    // 中文：确保速度和方向符号一致。
     if (!((command->target.x > 0.0) == (command->speed > 0.0)) ) {
       RCLCPP_ERROR(this->logger_, "Speed and command sign did not match");
       return Status::FAILED;
@@ -90,7 +93,9 @@ public:
 
   /**
    * @brief Loop function to run behavior
+   * 中文：运行 behavior 的循环函数。
    * @return Status of behavior
+   * 中文：behavior 状态。
    */
   Status onCycleUpdate() override
   {
@@ -130,7 +135,11 @@ public:
 
     bool forward = command_speed_ > 0.0;
     if (acceleration_limit_ == 0.0 || deceleration_limit_ == 0.0) {
-      RCLCPP_INFO_ONCE(this->logger_, "DriveOnHeading: no acceleration or deceleration limits set");
+      static bool logged_no_accel_limits = false;
+      if (!logged_no_accel_limits) {
+        LOG_INFO("DriveOnHeading: no acceleration or deceleration limits set");
+        logged_no_accel_limits = true;
+      }
       cmd_vel->linear.x = command_speed_;
     } else {
       double current_speed = last_vel_ == std::numeric_limits<double>::max() ? 0.0 : last_vel_;
@@ -145,6 +154,7 @@ public:
       cmd_vel->linear.x = std::clamp(command_speed_, min_feasible_speed, max_feasible_speed);
 
       // Check if we need to slow down to avoid overshooting
+      // 中文：检查是否需要减速以避免越过目标。
       auto remaining_distance = std::fabs(command_x_) - distance;
       double max_vel_to_stop = std::sqrt(-2.0 * deceleration_limit_ * remaining_distance);
       if (max_vel_to_stop < std::abs(cmd_vel->linear.x)) {
@@ -153,6 +163,7 @@ public:
     }
 
     // Ensure we don't go below minimum speed
+    // 中文：确保速度不低于最小速度。
     if (std::fabs(cmd_vel->linear.x) < minimum_speed_) {
       cmd_vel->linear.x = forward ? minimum_speed_ : -minimum_speed_;
     }
@@ -184,10 +195,12 @@ public:
 protected:
   /**
    * @brief Check if pose is collision free
+   * 中文：检查位姿是否无碰撞。
    * @param distance Distance to check forward
    * @param cmd_vel current commanded velocity
    * @param pose2d Current pose
    * @return is collision free or not
+   * 中文：是否无碰撞。
    */
   bool isCollisionFree(
     const double & distance,
@@ -195,6 +208,7 @@ protected:
     geometry_msgs::msg::Pose2D & pose2d)
   {
     // Simulate ahead by simulate_ahead_time_ in this->cycle_frequency_ increments
+    // 中文：按 this->cycle_frequency_ 的步长向前仿真 simulate_ahead_time_。
     int cycle_count = 0;
     double sim_position_change;
     const double diff_dist = abs(command_x_) - distance;
@@ -222,6 +236,7 @@ protected:
 
   /**
    * @brief Configuration of behavior action
+   * 中文：behavior action 配置。
    */
   void onConfigure() override
   {

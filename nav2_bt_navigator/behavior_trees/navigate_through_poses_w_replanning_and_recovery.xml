@@ -17,7 +17,7 @@
           </RecoveryNode>
         </RateController>
         <RecoveryNode number_of_retries="1" name="FollowPath">
-          <FollowPath path="{path}" controller_id="FollowPath"/>
+          <FollowPath path="{path}" controller_id=""/>
           <ClearEntireCostmap name="ClearLocalCostmap-Context" service_name="local_costmap/clear_entirely_local_costmap"/>
         </RecoveryNode>
       </PipelineSequence>
@@ -36,3 +36,16 @@
     </RecoveryNode>
   </BehaviorTree>
 </root>
+
+<!--
+中文说明：
+1. 这是多目标点导航行为树，输入是 blackboard["goals"] 中的一组 PoseStamped，
+   对应 /navigate_through_poses action 的目标序列。
+2. RateController 以 0.333Hz 触发全局路径重算，约每 3 秒规划一次，避免多目标路径频繁重算。
+3. RemovePassedGoals 会根据 radius=0.7 删除已经经过的目标点，并把剩余目标重新写回 {goals}；
+   ComputePathThroughPoses 再基于剩余目标调用 /compute_path_through_poses 生成一条全局路径。
+4. 生成的 {path} 写入 blackboard 后，FollowPath 持续调用 /follow_path action 跟踪该路径。
+5. 规划分支失败时清理 global_costmap 后重试；控制分支失败时清理 local_costmap 后重试。
+6. 顶层 NavigateRecovery 提供系统级恢复：目标更新可中断恢复，否则按清理代价地图、旋转、
+   等待、后退的 RoundRobin 顺序处理，再重新尝试多目标导航。
+-->

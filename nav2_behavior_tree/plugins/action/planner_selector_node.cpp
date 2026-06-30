@@ -22,6 +22,8 @@
 
 #include "rclcpp/rclcpp.hpp"
 
+#include "spdlog_wrapper.hpp"
+
 namespace nav2_behavior_tree
 {
 
@@ -32,6 +34,7 @@ PlannerSelector::PlannerSelector(
   const BT::NodeConfiguration & conf)
 : BT::SyncActionNode(name, conf)
 {
+  LOG_TRACE("BT plugin function entry: PlannerSelector::PlannerSelector");
   node_ = config().blackboard->get<rclcpp::Node::SharedPtr>("node");
   callback_group_ = node_->create_callback_group(
     rclcpp::CallbackGroupType::MutuallyExclusive,
@@ -54,6 +57,7 @@ PlannerSelector::PlannerSelector(
 
 BT::NodeStatus PlannerSelector::tick()
 {
+  LOG_TRACE("BT plugin function entry: PlannerSelector::tick");
   callback_group_executor_.spin_some();
 
   // This behavior always use the last selected planner received from the topic input.
@@ -79,6 +83,7 @@ BT::NodeStatus PlannerSelector::tick()
 void
 PlannerSelector::callbackPlannerSelect(const std_msgs::msg::String::SharedPtr msg)
 {
+  LOG_TRACE("BT plugin function entry: PlannerSelector::callbackPlannerSelect");
   last_selected_planner_ = msg->data;
 }
 
@@ -87,5 +92,6 @@ PlannerSelector::callbackPlannerSelect(const std_msgs::msg::String::SharedPtr ms
 #include "behaviortree_cpp_v3/bt_factory.h"
 BT_REGISTER_NODES(factory)
 {
+  LOG_INFO("Registering BT plugin nodes from nav2_ws/src/navigation2/nav2_behavior_tree/plugins/action/planner_selector_node.cpp");
   factory.registerNodeType<nav2_behavior_tree::PlannerSelector>("PlannerSelector");
 }

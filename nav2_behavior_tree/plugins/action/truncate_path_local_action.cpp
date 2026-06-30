@@ -26,6 +26,8 @@
 
 #include "nav2_behavior_tree/plugins/action/truncate_path_local_action.hpp"
 
+#include "spdlog_wrapper.hpp"
+
 namespace nav2_behavior_tree
 {
 
@@ -34,6 +36,7 @@ TruncatePathLocal::TruncatePathLocal(
   const BT::NodeConfiguration & conf)
 : BT::ActionNodeBase(name, conf)
 {
+  LOG_TRACE("BT plugin function entry: TruncatePathLocal::TruncatePathLocal");
   tf_buffer_ =
     config().blackboard->template get<std::shared_ptr<tf2_ros::Buffer>>(
     "tf_buffer");
@@ -41,6 +44,7 @@ TruncatePathLocal::TruncatePathLocal(
 
 inline BT::NodeStatus TruncatePathLocal::tick()
 {
+  LOG_TRACE("BT plugin function entry: TruncatePathLocal::tick");
   setStatus(BT::NodeStatus::RUNNING);
 
   double distance_forward, distance_backward;
@@ -121,6 +125,7 @@ inline bool TruncatePathLocal::getRobotPose(
     if (!nav2_util::getCurrentPose(
         pose, *tf_buffer_, path_frame_id, robot_frame, transform_tolerance))
     {
+  LOG_TRACE("BT plugin function entry: nav2_util::getCurrentPose");
       RCLCPP_WARN(
         config().blackboard->get<rclcpp::Node::SharedPtr>("node")->get_logger(),
         "Failed to lookup current robot pose for %s", name().c_str());

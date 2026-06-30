@@ -14,6 +14,8 @@
 
 #include "nav2_behavior_tree/plugins/condition/initial_pose_received_condition.hpp"
 
+#include "spdlog_wrapper.hpp"
+
 namespace nav2_behavior_tree
 {
 
@@ -28,6 +30,7 @@ BT::NodeStatus initialPoseReceived(BT::TreeNode & tree_node)
 #include "behaviortree_cpp_v3/bt_factory.h"
 BT_REGISTER_NODES(factory)
 {
+  LOG_INFO("Registering BT plugin nodes from nav2_ws/src/navigation2/nav2_behavior_tree/plugins/condition/initial_pose_received_condition.cpp");
   factory.registerSimpleCondition(
     "InitialPoseReceived",
     std::bind(&nav2_behavior_tree::initialPoseReceived, std::placeholders::_1));

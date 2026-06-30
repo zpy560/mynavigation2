@@ -26,7 +26,9 @@ namespace nav2_controller
 /**
 * @class PoseProgressChecker
 * @brief This plugin is used to check the position and the angle of the robot to make sure
+ * 中文：该插件用于检查机器人的位置和角度，确保
 * that it is actually progressing or rotating towards a goal.
+ * 中文：机器人确实在朝目标推进或旋转。
 */
 
 class PoseProgressChecker : public SimpleProgressChecker
@@ -40,8 +42,11 @@ public:
 protected:
   /**
    * @brief Calculates robots movement from baseline pose
+   * 中文：根据基准位姿计算机器人移动量。
    * @param pose Current pose of the robot
+   * 中文：机器人当前位姿。
    * @return true, if movement is greater than radius_, or false
+   * 中文：如果移动距离大于 radius_ 则返回 true，否则返回 false。
    */
   bool isRobotMovedEnough(const geometry_msgs::msg::Pose2D & pose);
 
@@ -52,12 +57,15 @@ protected:
   double required_movement_angle_;
 
   // Dynamic parameters handler
+  // 中文：动态参数处理器。
   rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr dyn_params_handler_;
   std::string plugin_name_;
 
   /**
-   * @brief Callback executed when a paramter change is detected
+   * @brief Callback executed when a parameter change is detected
+   * 中文：检测到参数变化时执行的回调。
    * @param parameters list of changed parameters
+   * 中文：已变化的参数列表。
    */
   rcl_interfaces::msg::SetParametersResult
   dynamicParametersCallback(std::vector<rclcpp::Parameter> parameters);

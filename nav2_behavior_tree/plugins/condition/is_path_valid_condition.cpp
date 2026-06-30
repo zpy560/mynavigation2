@@ -17,6 +17,8 @@
 #include <memory>
 #include <string>
 
+#include "spdlog_wrapper.hpp"
+
 namespace nav2_behavior_tree
 {
 
@@ -25,6 +27,7 @@ IsPathValidCondition::IsPathValidCondition(
   const BT::NodeConfiguration & conf)
 : BT::ConditionNode(condition_name, conf)
 {
+  LOG_TRACE("BT plugin function entry: IsPathValidCondition::IsPathValidCondition");
   node_ = config().blackboard->get<rclcpp::Node::SharedPtr>("node");
   client_ = node_->create_client<nav2_msgs::srv::IsPathValid>("is_path_valid");
 
@@ -34,6 +37,7 @@ IsPathValidCondition::IsPathValidCondition(
 
 BT::NodeStatus IsPathValidCondition::tick()
 {
+  LOG_TRACE("BT plugin function entry: IsPathValidCondition::tick");
   nav_msgs::msg::Path path;
   getInput("path", path);
 
@@ -57,5 +61,6 @@ BT::NodeStatus IsPathValidCondition::tick()
 #include "behaviortree_cpp_v3/bt_factory.h"
 BT_REGISTER_NODES(factory)
 {
+  LOG_INFO("Registering BT plugin nodes from nav2_ws/src/navigation2/nav2_behavior_tree/plugins/condition/is_path_valid_condition.cpp");
   factory.registerNodeType<nav2_behavior_tree::IsPathValidCondition>("IsPathValid");
 }

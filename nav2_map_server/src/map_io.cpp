@@ -40,6 +40,7 @@
 #include <fstream>
 #include <stdexcept>
 #include <cstdlib>
+#include <cstddef>
 
 #include "Magick++.h"
 #include "nav2_util/geometry_utils.hpp"
@@ -48,6 +49,7 @@
 #include "tf2/LinearMath/Matrix3x3.h"
 #include "tf2/LinearMath/Quaternion.h"
 #include "nav2_util/occ_grid_values.hpp"
+#include "spdlog_wrapper.hpp"
 
 #ifdef _WIN32
 // https://github.com/rtv/Stage/blob/master/replace/dirname.c
@@ -104,6 +106,7 @@ using nav2_util::geometry_utils::orientationAroundZAxis;
 /// The only reason this function exists is to wrap the exceptions in slightly nicer error messages,
 /// including the name of the failed key
 /// @throw YAML::Exception
+/// 中文：读取 YAML 子字段，并把底层解析异常包装成带字段名的错误信息。
 template<typename T>
 T yaml_get_value(const YAML::Node & node, const std::string & key)
 {
@@ -144,6 +147,10 @@ std::string expand_user_home_dir_if_needed(
 
 LoadParameters loadMapYaml(const std::string & yaml_filename)
 {
+  // Layer 1: YAML metadata. It does not contain map cells; it tells map_io how to interpret
+  // the image layer in metric space.
+  // 中文：第一层是 YAML 元数据层，不保存栅格本体，只描述图像如何映射到真实世界。
+  LOG_INFO("map_io loading YAML metadata '{}'", yaml_filename.c_str());
   YAML::Node doc = YAML::LoadFile(expand_user_home_dir_if_needed(yaml_filename, get_home_dir()));
   LoadParameters load_parameters;
 
@@ -153,6 +160,7 @@ LoadParameters loadMapYaml(const std::string & yaml_filename)
   }
   if (image_file_name[0] != '/') {
     // dirname takes a mutable char *, so we copy into a vector
+    // 中文：相对图片路径基于 YAML 文件所在目录展开为绝对/可访问路径。
     std::vector<char> fname_copy(yaml_filename.begin(), yaml_filename.end());
     fname_copy.push_back('\0');
     image_file_name = std::string(dirname(fname_copy.data())) + '/' + image_file_name;
@@ -195,6 +203,12 @@ LoadParameters loadMapYaml(const std::string & yaml_filename)
     rclcpp::get_logger("map_io"),
     "mode: " << map_mode_to_string(load_parameters.mode));
   RCLCPP_INFO_STREAM(rclcpp::get_logger("map_io"), "negate: " << load_parameters.negate);
+  LOG_INFO(
+    "map_io YAML parsed image='{}', resolution={}, origin=({}, {}, {}), free_thresh={}, occupied_thresh={}, mode='{}', negate={}",
+    load_parameters.image_file_name.c_str(), load_parameters.resolution,
+    load_parameters.origin[0], load_parameters.origin[1], load_parameters.origin[2],
+    load_parameters.free_thresh, load_parameters.occupied_thresh,
+    map_mode_to_string(load_parameters.mode), load_parameters.negate);
 
   return load_parameters;
 }
@@ -205,6 +219,11 @@ void loadMapFromFile(
 {
   Magick::InitializeMagick(nullptr);
   nav_msgs::msg::OccupancyGrid msg;
+  // Layer 2 starts here: read image pixels and convert color intensity into occupancy values.
+  // 中文：第二层 image 像素层从这里开始读取，像素亮度会被转换为占用概率/未知值。
+  LOG_INFO(
+    "map_io loading image '{}' into OccupancyGrid",
+    load_parameters.image_file_name.c_str());
 
   RCLCPP_INFO_STREAM(
     rclcpp::get_logger("map_io"), "Loading image_file: " <<
@@ -212,6 +231,7 @@ void loadMapFromFile(
   Magick::Image img(load_parameters.image_file_name);
 
   // Copy the image data into the map structure
+  // 中文：图像宽高对应 OccupancyGrid 的宽高，分辨率和原点来自 YAML。
   msg.info.width = img.size().width();
   msg.info.height = img.size().height();
 
@@ -222,9 +242,14 @@ void loadMapFromFile(
   msg.info.origin.orientation = orientationAroundZAxis(load_parameters.origin[2]);
 
   // Allocate space to hold the data
+  // 中文：为每个地图栅格分配一个占用值，范围通常为 free/occupied/unknown。
   msg.data.resize(msg.info.width * msg.info.height);
 
   // Copy pixel data into the map structure
+  // 中文：逐像素读取图像颜色，根据模式和阈值转换为 OccupancyGrid 栅格占用值。
+  std::size_t free_cells = 0;
+  std::size_t occupied_cells = 0;
+  std::size_t unknown_cells = 0;
   for (size_t y = 0; y < msg.info.height; y++) {
     for (size_t x = 0; x < msg.info.width; x++) {
       auto pixel = img.pixelColor(x, y);
@@ -234,6 +259,7 @@ void loadMapFromFile(
       if (load_parameters.mode == MapMode::Trinary && img.matte()) {
         // To preserve existing behavior, average in alpha with color channels in Trinary mode.
         // CAREFUL. alpha is inverted from what you might expect. High = transparent, low = opaque
+        // 中文：Trinary 模式下透明度参与平均，注意 GraphicsMagick 的 alpha 语义是反向的。
         channels.push_back(MaxRGB - pixel.alphaQuantum());
       }
       double sum = 0;
@@ -245,6 +271,7 @@ void loadMapFromFile(
 
       // If negate is true, we consider blacker pixels free, and whiter
       // pixels occupied. Otherwise, it's vice versa.
+      // 中文：negate 控制黑白含义是否翻转，从而影响占用概率计算。
       /// on a scale from 0.0 to 1.0, how occupied is the map cell (before thresholding)?
       double occ = (load_parameters.negate ? shade : 1.0 - shade);
 
@@ -286,11 +313,21 @@ void loadMapFromFile(
         default:
           throw std::runtime_error("Invalid map mode");
       }
+      if (map_cell == nav2_util::OCC_GRID_FREE) {
+        ++free_cells;
+      } else if (map_cell == nav2_util::OCC_GRID_OCCUPIED) {
+        ++occupied_cells;
+      } else if (map_cell == nav2_util::OCC_GRID_UNKNOWN) {
+        ++unknown_cells;
+      }
       msg.data[msg.info.width * (msg.info.height - y - 1) + x] = map_cell;
     }
   }
 
+  // Layer 3: OccupancyGrid runtime message. From this point, Nav2 consumes the map as ROS data.
+  // 中文：第三层是 OccupancyGrid 运行时消息，Nav2 后续只消费这个 ROS 消息结构。
   // Since loadMapFromFile() does not belong to any node, publishing in a system time.
+  // 中文：map_io 不是节点对象，无法使用节点时钟，因此使用系统时间填充 header。
   rclcpp::Clock clock(RCL_SYSTEM_TIME);
   msg.info.map_load_time = clock.now();
   msg.header.frame_id = "map";
@@ -303,17 +340,24 @@ void loadMapFromFile(
                              << msg.info.resolution << " m/cell");
 
   map = msg;
+  LOG_INFO(
+    "map_io converted image layer to OccupancyGrid layer width={}, height={}, resolution={}, free_cells={}, occupied_cells={}, unknown_cells={}",
+    map.info.width, map.info.height, map.info.resolution, free_cells, occupied_cells,
+    unknown_cells);
 }
 
 LOAD_MAP_STATUS loadMapFromYaml(
   const std::string & yaml_file,
   nav_msgs::msg::OccupancyGrid & map)
 {
+  // Full read pipeline: YAML metadata layer -> image pixel layer -> OccupancyGrid message layer.
+  // 中文：完整读取链路：YAML 元数据层 -> image 像素层 -> OccupancyGrid 消息层。
   if (yaml_file.empty()) {
     RCLCPP_ERROR_STREAM(rclcpp::get_logger("map_io"), "YAML file name is empty, can't load!");
     return MAP_DOES_NOT_EXIST;
   }
   RCLCPP_INFO_STREAM(rclcpp::get_logger("map_io"), "Loading yaml file: " << yaml_file);
+  LOG_INFO("map_io begin loadMapFromYaml '{}'", yaml_file.c_str());
   LoadParameters load_parameters;
   try {
     load_parameters = loadMapYaml(yaml_file);
@@ -330,6 +374,7 @@ LOAD_MAP_STATUS loadMapFromYaml(
     return INVALID_MAP_METADATA;
   }
   try {
+    // 中文：先解析 YAML 元数据，再读取 image 文件并转换为 OccupancyGrid。
     loadMapFromFile(load_parameters, map);
   } catch (std::exception & e) {
     RCLCPP_ERROR_STREAM(
@@ -339,6 +384,9 @@ LOAD_MAP_STATUS loadMapFromYaml(
     return INVALID_MAP_DATA;
   }
 
+  LOG_INFO(
+    "map_io loadMapFromYaml success '{}', width={}, height={}, resolution={}",
+    yaml_file.c_str(), map.info.width, map.info.height, map.info.resolution);
   return LOAD_MAP_SUCCESS;
 }
 
@@ -349,13 +397,20 @@ LOAD_MAP_STATUS loadMapFromYaml(
  * @param save_parameters Map saving parameters.
  * NOTE: save_parameters could be updated during function execution.
  * @throw std::exception in case of inconsistent parameters
+ * 中文：检查并补齐地图保存参数，包括文件名、阈值、图片格式和保存模式。
  */
 void checkSaveParameters(SaveParameters & save_parameters)
 {
   // Magick must me initialized before any activity with images
+  // 中文：GraphicsMagick 在读写图片前必须初始化。
   Magick::InitializeMagick(nullptr);
+  LOG_INFO(
+    "map_io checking save parameters file='{}', format='{}', mode='{}'",
+    save_parameters.map_file_name.c_str(), save_parameters.image_format.c_str(),
+    map_mode_to_string(save_parameters.mode));
 
   // Checking map file name
+  // 中文：未指定输出名前缀时，按当前系统时间生成 map_<timestamp>。
   if (save_parameters.map_file_name == "") {
     rclcpp::Clock clock(RCL_SYSTEM_TIME);
     save_parameters.map_file_name = "map_" +
@@ -366,6 +421,7 @@ void checkSaveParameters(SaveParameters & save_parameters)
   }
 
   // Checking thresholds
+  // 中文：阈值为空时填默认值，并确保 free < occupied 且范围有效。
   if (save_parameters.occupied_thresh == 0.0) {
     save_parameters.occupied_thresh = 0.65;
     RCLCPP_WARN_STREAM(
@@ -395,6 +451,7 @@ void checkSaveParameters(SaveParameters & save_parameters)
   }
 
   // Checking image format
+  // 中文：未指定图片格式时，Scale 默认 png，其余模式默认 pgm。
   if (save_parameters.image_format == "") {
     save_parameters.image_format = save_parameters.mode == MapMode::Scale ? "png" : "pgm";
     RCLCPP_WARN_STREAM(
@@ -445,6 +502,7 @@ void checkSaveParameters(SaveParameters & save_parameters)
   }
 
   // Checking map mode
+  // 中文：Scale 模式需要透明通道，使用不支持透明的格式时给出告警。
   if (
     save_parameters.mode == MapMode::Scale &&
     (save_parameters.image_format == "pgm" ||
@@ -463,6 +521,7 @@ void checkSaveParameters(SaveParameters & save_parameters)
  * @param map Occupancy grid data
  * @param save_parameters Map saving parameters
  * @throw std::expection in case of problem
+ * 中文：把 OccupancyGrid 的 data 写成图片，同时写出 YAML 元数据。
  */
 void tryWriteMapToFile(
   const nav_msgs::msg::OccupancyGrid & map,
@@ -476,16 +535,19 @@ void tryWriteMapToFile(
   std::string mapdatafile = save_parameters.map_file_name + "." + save_parameters.image_format;
   {
     // should never see this color, so the initialization value is just for debugging
+    // 中文：先创建调试用红色底图，后续每个像素都会被真实占用值覆盖。
     Magick::Image image({map.info.width, map.info.height}, "red");
 
     // In scale mode, we need the alpha (matte) channel. Else, we don't.
     // NOTE: GraphicsMagick seems to have trouble loading the alpha channel when saved with
     // Magick::GreyscaleMatte, so we use TrueColorMatte instead.
+    // 中文：Scale 模式需要透明通道表示 unknown，因此使用 TrueColorMatte。
     image.type(
       save_parameters.mode == MapMode::Scale ?
       Magick::TrueColorMatteType : Magick::GrayscaleType);
 
     // Since we only need to support 100 different pixel levels, 8 bits is fine
+    // 中文：占用概率只需 0-100，8 bit 深度足够表达。
     image.depth(8);
 
     int free_thresh_int = std::rint(save_parameters.free_thresh * 100.0);
@@ -539,6 +601,7 @@ void tryWriteMapToFile(
     RCLCPP_INFO_STREAM(
       rclcpp::get_logger("map_io"),
       "Writing map occupancy data to " << mapdatafile);
+    LOG_INFO("map_io writing map occupancy image '{}'", mapdatafile.c_str());
     image.write(mapdatafile);
   }
 
@@ -573,9 +636,13 @@ void tryWriteMapToFile(
     }
 
     RCLCPP_INFO_STREAM(rclcpp::get_logger("map_io"), "Writing map metadata to " << mapmetadatafile);
+    LOG_INFO("map_io writing map metadata YAML '{}'", mapmetadatafile.c_str());
     std::ofstream(mapmetadatafile) << e.c_str();
   }
   RCLCPP_INFO_STREAM(rclcpp::get_logger("map_io"), "Map saved");
+  LOG_INFO(
+    "map_io saved map files prefix='{}', image_format='{}'",
+    save_parameters.map_file_name.c_str(), save_parameters.image_format.c_str());
 }
 
 bool saveMapToFile(
@@ -583,12 +650,19 @@ bool saveMapToFile(
   const SaveParameters & save_parameters)
 {
   // Local copy of SaveParameters that might be modified by checkSaveParameters()
+  // 中文：保存参数会被校验函数补默认值，因此这里先创建局部副本。
   SaveParameters save_parameters_loc = save_parameters;
+  LOG_INFO(
+    "map_io saveMapToFile begin width={}, height={}, resolution={}, file='{}'",
+    map.info.width, map.info.height, map.info.resolution,
+    save_parameters.map_file_name.c_str());
 
   try {
     // Checking map parameters for consistency
+    // 中文：检查输出文件名、图片格式、阈值和模式是否可用。
     checkSaveParameters(save_parameters_loc);
 
+    // 中文：执行实际文件写入，生成图片和 YAML 两个文件。
     tryWriteMapToFile(map, save_parameters_loc);
   } catch (std::exception & e) {
     RCLCPP_ERROR_STREAM(
@@ -596,6 +670,9 @@ bool saveMapToFile(
       "Failed to write map for reason: " << e.what());
     return false;
   }
+  LOG_INFO(
+    "map_io saveMapToFile success file='{}'",
+    save_parameters_loc.map_file_name.c_str());
   return true;
 }
 

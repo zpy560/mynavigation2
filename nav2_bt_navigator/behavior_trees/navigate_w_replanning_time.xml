@@ -8,7 +8,17 @@
       <RateController hz="1.0">
         <ComputePathToPose goal="{goal}" path="{path}" planner_id="GridBased"/>
       </RateController>
-      <FollowPath path="{path}"  controller_id="FollowPath"/>
+      <FollowPath path="{path}"  controller_id=""/>
     </PipelineSequence>
   </BehaviorTree>
 </root>
+
+<!--
+中文说明：
+1. 这是按固定时间周期重规划的最小导航树，不包含恢复逻辑。
+2. RateController hz=1.0 让 ComputePathToPose 每秒最多执行一次，读取 {goal} 并更新 {path}。
+3. PipelineSequence 允许 FollowPath 在运行中继续接收新的 {path}，形成“边走边每秒重规划”的行为。
+4. FollowPath 的 controller_id 留空时，会从 bt_navigator.selected_controller 参数读取控制器 ID，
+   再调用 /follow_path action；底层由 controller_server 和对应控制器插件输出速度。
+5. 因为没有 RecoveryNode，任何规划失败、控制失败或 action server 异常都会直接使整棵树失败。
+-->

@@ -19,6 +19,8 @@
 
 #include "nav2_behavior_tree/plugins/condition/path_expiring_timer_condition.hpp"
 
+#include "spdlog_wrapper.hpp"
+
 namespace nav2_behavior_tree
 {
 
@@ -29,12 +31,14 @@ PathExpiringTimerCondition::PathExpiringTimerCondition(
   period_(1.0),
   first_time_(true)
 {
+  LOG_TRACE("BT plugin function entry: PathExpiringTimerCondition::PathExpiringTimerCondition");
   getInput("seconds", period_);
   node_ = config().blackboard->get<rclcpp::Node::SharedPtr>("node");
 }
 
 BT::NodeStatus PathExpiringTimerCondition::tick()
 {
+  LOG_TRACE("BT plugin function entry: PathExpiringTimerCondition::tick");
   if (first_time_) {
     getInput("path", prev_path_);
     first_time_ = false;
@@ -71,5 +75,6 @@ BT::NodeStatus PathExpiringTimerCondition::tick()
 #include "behaviortree_cpp_v3/bt_factory.h"
 BT_REGISTER_NODES(factory)
 {
+  LOG_INFO("Registering BT plugin nodes from nav2_ws/src/navigation2/nav2_behavior_tree/plugins/condition/path_expiring_timer_condition.cpp");
   factory.registerNodeType<nav2_behavior_tree::PathExpiringTimerCondition>("PathExpiringTimer");
 }

@@ -50,15 +50,19 @@ namespace nav2_controller
 /**
  * @class SimpleGoalChecker
  * @brief Goal Checker plugin that only checks the position difference
+  * 中文：只检查位置偏差的 GoalChecker 插件。
  *
  * This class can be stateful if the stateful parameter is set to true (which it is by default).
+  * 中文：如果 stateful 参数为 true（默认值），该类可以保持状态。
  * This means that the goal checker will not check if the xy position matches again once it is found to be true.
+  * 中文：这意味着一旦 xy 位置满足条件，goal checker 后续不会再次检查 xy 是否匹配。
  */
 class SimpleGoalChecker : public nav2_core::GoalChecker
 {
 public:
   SimpleGoalChecker();
   // Standard GoalChecker Interface
+  // 中文：标准 GoalChecker 接口。
   void initialize(
     const rclcpp_lifecycle::LifecycleNode::WeakPtr & parent,
     const std::string & plugin_name,
@@ -76,14 +80,18 @@ protected:
   bool stateful_, check_xy_;
   bool symmetric_yaw_tolerance_;
   // Cached squared xy_goal_tolerance_
+  // 中文：缓存的 xy_goal_tolerance_ 平方值。
   double xy_goal_tolerance_sq_;
   // Dynamic parameters handler
+  // 中文：动态参数处理器。
   rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr dyn_params_handler_;
   std::string plugin_name_;
 
   /**
-   * @brief Callback executed when a paramter change is detected
+   * @brief Callback executed when a parameter change is detected
+   * 中文：检测到参数变化时执行的回调。
    * @param parameters list of changed parameters
+   * 中文：已变化的参数列表。
    */
   rcl_interfaces::msg::SetParametersResult
   dynamicParametersCallback(std::vector<rclcpp::Parameter> parameters);

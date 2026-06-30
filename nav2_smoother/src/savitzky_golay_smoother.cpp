@@ -57,6 +57,7 @@ bool SavitzkyGolaySmoother::smooth(
   for (unsigned int i = 0; i != path_segments.size(); i++) {
     if (path_segments[i].end - path_segments[i].start > 9) {
       // Populate path segment
+      // 中文：填充路径片段。
       curr_path_segment.poses.clear();
       std::copy(
         path.poses.begin() + path_segments[i].start,
@@ -64,6 +65,7 @@ bool SavitzkyGolaySmoother::smooth(
         std::back_inserter(curr_path_segment.poses));
 
       // Make sure we're still able to smooth with time remaining
+      // 中文：确保剩余时间仍允许继续平滑。
       steady_clock::time_point now = steady_clock::now();
       time_remaining = max_time.seconds() - duration_cast<duration<double>>(now - start).count();
 
@@ -75,9 +77,11 @@ bool SavitzkyGolaySmoother::smooth(
       }
 
       // Smooth path segment
+      // 中文：平滑路径片段。
       success = success && smoothImpl(curr_path_segment, reversing_segment);
 
       // Assemble the path changes to the main path
+      // 中文：将路径片段改动合并回主路径。
       std::copy(
         curr_path_segment.poses.begin(),
         curr_path_segment.poses.end(),
@@ -93,6 +97,7 @@ bool SavitzkyGolaySmoother::smoothImpl(
   bool & reversing_segment)
 {
   // Must be at least 10 in length to enter function
+  // 中文：长度至少为 10 才能进入该函数。
   const unsigned int & path_size = path.poses.size();
 
   // 7-point SG filter
@@ -120,6 +125,7 @@ bool SavitzkyGolaySmoother::smoothImpl(
     [&](std::vector<geometry_msgs::msg::PoseStamped> & plan_pts) -> void
     {
       // Handle initial boundary conditions, first point is fixed
+      // 中文：处理初始边界条件，第一个点固定。
       unsigned int idx = 1;
       plan_pts[idx].pose.position = applyFilter(
       {
@@ -143,6 +149,7 @@ bool SavitzkyGolaySmoother::smoothImpl(
         plan_pts[idx + 3].pose.position});
 
       // Apply nominal filter
+      // 中文：应用标准滤波器。
       for (idx = 3; idx < path_size - 4; ++idx) {
         plan_pts[idx].pose.position = applyFilter(
         {
@@ -156,6 +163,7 @@ bool SavitzkyGolaySmoother::smoothImpl(
       }
 
       // Handle terminal boundary conditions, last point is fixed
+      // 中文：处理末端边界条件，最后一个点固定。
       idx++;
       plan_pts[idx].pose.position = applyFilter(
       {
@@ -182,6 +190,7 @@ bool SavitzkyGolaySmoother::smoothImpl(
   applyFilterOverAxes(path.poses);
 
   // Lets do additional refinement, it shouldn't take more than a couple milliseconds
+  // 中文：执行额外细化，预计只需几毫秒。
   if (do_refinement_) {
     for (int i = 0; i < refinement_num_; i++) {
       applyFilterOverAxes(path.poses);

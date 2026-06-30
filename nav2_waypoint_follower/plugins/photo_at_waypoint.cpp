@@ -20,6 +20,7 @@
 #include "pluginlib/class_list_macros.hpp"
 
 #include "nav2_util/node_utils.hpp"
+#include "spdlog_wrapper.hpp"
 
 namespace nav2_waypoint_follower
 {
@@ -86,12 +87,9 @@ void PhotoAtWaypoint::initialize(
   }
 
   if (!is_enabled_) {
-    RCLCPP_INFO(
-      logger_, "Photo at waypoint plugin is disabled.");
+    LOG_INFO("Photo at waypoint plugin is disabled.");
   } else {
-    RCLCPP_INFO(
-      logger_, "Initializing photo at waypoint plugin, subscribing to camera topic named; %s",
-      image_topic_.c_str());
+    LOG_INFO("Initializing photo at waypoint plugin, subscribing to camera topic named; {}", image_topic_.c_str());
     camera_image_subscriber_ = node->create_subscription<sensor_msgs::msg::Image>(
       image_topic_, rclcpp::SystemDefaultsQoS(),
       std::bind(&PhotoAtWaypoint::imageCallback, this, std::placeholders::_1));
@@ -120,9 +118,7 @@ bool PhotoAtWaypoint::processAtWaypoint(
     cv::Mat curr_frame_mat;
     deepCopyMsg2Mat(curr_frame_msg_, curr_frame_mat);
     cv::imwrite(full_path_image_path.c_str(), curr_frame_mat);
-    RCLCPP_INFO(
-      logger_,
-      "Photo has been taken sucessfully at waypoint %i", curr_waypoint_index);
+    LOG_INFO("Photo has been taken sucessfully at waypoint {}", curr_waypoint_index);
   } catch (const std::exception & e) {
     RCLCPP_ERROR(
       logger_,

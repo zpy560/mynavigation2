@@ -40,8 +40,12 @@ SmootherServer::SmootherServer(const rclcpp::NodeOptions & options)
   default_ids_{"simple_smoother"},
   default_types_{"nav2_smoother::SimpleSmoother"}
 {
-  RCLCPP_INFO(get_logger(), "Creating smoother server");
+  // SpdlogWrapper::init("nav2_smoother", get_name());
+  LOG_INFO("Creating smoother server");
+  LOG_INFO("Smoother server loads path smoother plugins and collision checking inputs");
 
+  // 中文注释：SmootherServer 是全局路径的后处理节点；它不负责重新规划，
+  // 只接收 planner_server 生成的 Path，并按 smoother_id 调用对应平滑plugin
   declare_parameter(
     "costmap_topic", rclcpp::ParameterValue(
       std::string(
@@ -65,10 +69,13 @@ SmootherServer::~SmootherServer()
 nav2_util::CallbackReturn
 SmootherServer::on_configure(const rclcpp_lifecycle::State &)
 {
-  RCLCPP_INFO(get_logger(), "Configuring smoother server");
+  LOG_INFO("Configuring smoother server");
+  LOG_INFO("Configuring smoother plugins, costmap subscriber and SmoothPath action server");
 
   auto node = shared_from_this();
 
+  // 中文注释：smoother_plugins 决定本节点可用的平滑算法集合；
+  // 默认 simple_smoother 只做轻量级路径形状优化，配置失败会阻止节点进入 active。
   get_parameter("smoother_plugins", smoother_ids_);
   if (smoother_ids_ == default_ids_) {
     for (size_t i = 0; i < default_ids_.size(); ++i) {
@@ -90,6 +97,9 @@ SmootherServer::on_configure(const rclcpp_lifecycle::State &)
   this->get_parameter("footprint_topic", footprint_topic);
   this->get_parameter("transform_tolerance", transform_tolerance);
   this->get_parameter("robot_base_frame", robot_base_frame);
+  LOG_INFO(
+    "Smoother inputs costmap_topic={}, footprint_topic={}, robot_base_frame={}, transform_tolerance={}",
+    costmap_topic.c_str(), footprint_topic.c_str(), robot_base_frame.c_str(), transform_tolerance);
   costmap_sub_ = std::make_shared<nav2_costmap_2d::CostmapSubscriber>(
     shared_from_this(), costmap_topic);
   footprint_sub_ = std::make_shared<nav2_costmap_2d::FootprintSubscriber>(
@@ -104,9 +114,13 @@ SmootherServer::on_configure(const rclcpp_lifecycle::State &)
   }
 
   // Initialize pubs & subs
+  // 中文：初始化发布器和订阅器。
   plan_publisher_ = create_publisher<nav_msgs::msg::Path>("plan_smoothed", 1);
 
+  // 中文注释：BT Navigator 可通过 SmoothPath action 请求路径平滑；
+  // 输出发布到 plan_smoothed，供 RViz/调试观察平滑后的路径。
   // Create the action server that we implement with our smoothPath method
+  // 中文：创建由 smoothPath 方法实现的 action server。
   action_server_ = std::make_unique<ActionServer>(
     shared_from_this(),
     "smooth_path",
@@ -130,9 +144,7 @@ bool SmootherServer::loadSmootherPlugins()
         nav2_util::get_plugin_type_param(node, smoother_ids_[i]);
       nav2_core::Smoother::Ptr smoother =
         lp_loader_.createUniqueInstance(smoother_types_[i]);
-      RCLCPP_INFO(
-        get_logger(), "Created smoother : %s of type %s",
-        smoother_ids_[i].c_str(), smoother_types_[i].c_str());
+      LOG_INFO("Created smoother : {} of type {}", smoother_ids_[i].c_str(), smoother_types_[i].c_str());
       smoother->configure(
         node, smoother_ids_[i], tf_, costmap_sub_,
         footprint_sub_);
@@ -149,9 +161,7 @@ bool SmootherServer::loadSmootherPlugins()
     smoother_ids_concat_ += smoother_ids_[i] + std::string(" ");
   }
 
-  RCLCPP_INFO(
-    get_logger(), "Smoother Server has %s smoothers available.",
-    smoother_ids_concat_.c_str());
+  LOG_INFO("Smoother Server has {} smoothers available.", smoother_ids_concat_.c_str());
 
   return true;
 }
@@ -159,7 +169,8 @@ bool SmootherServer::loadSmootherPlugins()
 nav2_util::CallbackReturn
 SmootherServer::on_activate(const rclcpp_lifecycle::State &)
 {
-  RCLCPP_INFO(get_logger(), "Activating");
+  LOG_INFO("Activating");
+  LOG_INFO("Activating smoother server action and path publisher");
 
   plan_publisher_->on_activate();
   SmootherMap::iterator it;
@@ -169,6 +180,7 @@ SmootherServer::on_activate(const rclcpp_lifecycle::State &)
   action_server_->activate();
 
   // create bond connection
+  // 中文：创建 bond 连接。
   createBond();
 
   return nav2_util::CallbackReturn::SUCCESS;
@@ -177,7 +189,7 @@ SmootherServer::on_activate(const rclcpp_lifecycle::State &)
 nav2_util::CallbackReturn
 SmootherServer::on_deactivate(const rclcpp_lifecycle::State &)
 {
-  RCLCPP_INFO(get_logger(), "Deactivating");
+  LOG_INFO("Deactivating");
 
   action_server_->deactivate();
   SmootherMap::iterator it;
@@ -187,6 +199,7 @@ SmootherServer::on_deactivate(const rclcpp_lifecycle::State &)
   plan_publisher_->on_deactivate();
 
   // destroy bond connection
+  // 中文：销毁 bond 连接。
   destroyBond();
 
   return nav2_util::CallbackReturn::SUCCESS;
@@ -195,9 +208,10 @@ SmootherServer::on_deactivate(const rclcpp_lifecycle::State &)
 nav2_util::CallbackReturn
 SmootherServer::on_cleanup(const rclcpp_lifecycle::State &)
 {
-  RCLCPP_INFO(get_logger(), "Cleaning up");
+  LOG_INFO("Cleaning up");
 
   // Cleanup the helper classes
+  // 中文：清理辅助类。
   SmootherMap::iterator it;
   for (it = smoothers_.begin(); it != smoothers_.end(); ++it) {
     it->second->cleanup();
@@ -205,6 +219,7 @@ SmootherServer::on_cleanup(const rclcpp_lifecycle::State &)
   smoothers_.clear();
 
   // Release any allocated resources
+  // 中文：释放已分配的资源。
   action_server_.reset();
   plan_publisher_.reset();
   transform_listener_.reset();
@@ -219,7 +234,7 @@ SmootherServer::on_cleanup(const rclcpp_lifecycle::State &)
 nav2_util::CallbackReturn
 SmootherServer::on_shutdown(const rclcpp_lifecycle::State &)
 {
-  RCLCPP_INFO(get_logger(), "Shutting down");
+  LOG_INFO("Shutting down");
   return nav2_util::CallbackReturn::SUCCESS;
 }
 
@@ -256,7 +271,7 @@ void SmootherServer::smoothPlan()
 {
   auto start_time = this->now();
 
-  RCLCPP_INFO(get_logger(), "Received a path to smooth.");
+  LOG_INFO("Received a path to smooth.");
 
   auto result = std::make_shared<Action::Result>();
   try {
@@ -273,26 +288,29 @@ void SmootherServer::smoothPlan()
       action_server_->terminate_current();
       return;
     }
+    LOG_INFO(
+      "Smoothing path with {} poses using smoother {}",
+      goal->path.poses.size(), current_smoother_.c_str());
 
+    // 中文注释：插件只修改 result->path，本节点负责统计耗时、发布调试路径，
+    // 并按需用 costmap/footprint 对平滑结果做碰撞检查。
     // Perform smoothing
+    // 中文：执行路径平滑。
     result->path = goal->path;
     result->was_completed = smoothers_[current_smoother_]->smooth(
       result->path, goal->max_smoothing_duration);
     result->smoothing_duration = this->now() - start_time;
 
     if (!result->was_completed) {
-      RCLCPP_INFO(
-        get_logger(),
-        "Smoother %s did not complete smoothing in specified time limit"
-        "(%lf seconds) and was interrupted after %lf seconds",
-        current_smoother_.c_str(),
-        rclcpp::Duration(goal->max_smoothing_duration).seconds(),
-        rclcpp::Duration(result->smoothing_duration).seconds());
+      LOG_INFO("Smoother {} did not complete smoothing in specified time limit"
+        "({} seconds) and was interrupted after {} seconds", current_smoother_.c_str(), rclcpp::Duration(goal->max_smoothing_duration).seconds(), rclcpp::Duration(result->smoothing_duration).seconds());
     }
     plan_publisher_->publish(result->path);
 
     // Check for collisions
+    // 中文：检查碰撞。
     if (goal->check_for_collisions) {
+      LOG_INFO("Checking smoothed path collision state before returning result");
       geometry_msgs::msg::Pose2D pose2d;
       bool fetch_data = true;
       for (const auto & pose : result->path.poses) {
@@ -315,6 +333,9 @@ void SmootherServer::smoothPlan()
     RCLCPP_DEBUG(
       get_logger(), "Smoother succeeded (time: %lf), setting result",
       rclcpp::Duration(result->smoothing_duration).seconds());
+    LOG_INFO(
+      "Smoother {} completed in {:.3f} seconds",
+      current_smoother_.c_str(), rclcpp::Duration(result->smoothing_duration).seconds());
 
     action_server_->succeeded_current(result);
   } catch (nav2_core::PlannerException & e) {
@@ -333,6 +354,9 @@ void SmootherServer::smoothPlan()
 #include "rclcpp_components/register_node_macro.hpp"
 
 // Register the component with class_loader.
+// 中文：将组件注册到 class_loader。
 // This acts as a sort of entry point, allowing the component to be discoverable when its library
+// 中文：这相当于组件入口，使组件所在库被加载时可以被发现。
 // is being loaded into a running process.
+// 中文：当组件库被加载到运行中的进程时可被发现。
 RCLCPP_COMPONENTS_REGISTER_NODE(nav2_smoother::SmootherServer)

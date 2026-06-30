@@ -19,6 +19,7 @@
 #include "pluginlib/class_list_macros.hpp"
 
 #include "nav2_util/node_utils.hpp"
+#include "spdlog_wrapper.hpp"
 
 namespace nav2_waypoint_follower
 {
@@ -66,8 +67,7 @@ void InputAtWaypoint::initialize(
 
   timeout_ = rclcpp::Duration(timeout, 0.0);
 
-  RCLCPP_INFO(
-    logger_, "InputAtWaypoint: Subscribing to input topic %s.", input_topic.c_str());
+  LOG_INFO("InputAtWaypoint: Subscribing to input topic {}.", input_topic.c_str());
   subscription_ = node->create_subscription<std_msgs::msg::Empty>(
     input_topic, 1, std::bind(&InputAtWaypoint::Cb, this, _1));
 }

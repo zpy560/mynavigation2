@@ -21,6 +21,8 @@
 
 #include "rclcpp/rclcpp.hpp"
 
+#include "spdlog_wrapper.hpp"
+
 namespace nav2_behavior_tree
 {
 
@@ -31,6 +33,7 @@ ProgressCheckerSelector::ProgressCheckerSelector(
   const BT::NodeConfiguration & conf)
 : BT::SyncActionNode(name, conf)
 {
+  LOG_TRACE("BT plugin function entry: ProgressCheckerSelector::ProgressCheckerSelector");
   node_ = config().blackboard->get<rclcpp::Node::SharedPtr>("node");
 
   getInput("topic_name", topic_name_);
@@ -44,6 +47,7 @@ ProgressCheckerSelector::ProgressCheckerSelector(
 
 BT::NodeStatus ProgressCheckerSelector::tick()
 {
+  LOG_TRACE("BT plugin function entry: ProgressCheckerSelector::tick");
   rclcpp::spin_some(node_);
 
   // This behavior always use the last selected progress checker received from the topic input.
@@ -69,6 +73,7 @@ BT::NodeStatus ProgressCheckerSelector::tick()
 void
 ProgressCheckerSelector::callbackProgressCheckerSelect(const std_msgs::msg::String::SharedPtr msg)
 {
+  LOG_TRACE("BT plugin function entry: ProgressCheckerSelector::callbackProgressCheckerSelect");
   last_selected_progress_checker_ = msg->data;
 }
 
@@ -77,5 +82,6 @@ ProgressCheckerSelector::callbackProgressCheckerSelect(const std_msgs::msg::Stri
 #include "behaviortree_cpp_v3/bt_factory.h"
 BT_REGISTER_NODES(factory)
 {
+  LOG_INFO("Registering BT plugin nodes from nav2_ws/src/navigation2/nav2_behavior_tree/plugins/action/progress_checker_selector_node.cpp");
   factory.registerNodeType<nav2_behavior_tree::ProgressCheckerSelector>("ProgressCheckerSelector");
 }

@@ -64,6 +64,8 @@ AmclNode::AmclNode(const rclcpp::NodeOptions & options)
 {
   RCLCPP_INFO(get_logger(), "Creating");
 
+  // 中文注释：AMCL 的参数分为运动模型、激光观测模型、粒子滤波器规模、
+  // TF 发布和初始位姿几类；构造函数只声明参数，不创建订阅和滤波器。
   add_parameter(
     "alpha1", rclcpp::ParameterValue(0.2),
     "This is the alpha1 parameter", "These are additional constraints for alpha1");
@@ -237,6 +239,8 @@ nav2_util::CallbackReturn
 AmclNode::on_configure(const rclcpp_lifecycle::State & /*state*/)
 {
   RCLCPP_INFO(get_logger(), "Configuring");
+  // 中文注释：configure 阶段读取参数并创建 TF、订阅、服务和粒子滤波器资源；
+  // active 前不会正式处理激光或发布定位结果。
   callback_group_ = create_callback_group(
     rclcpp::CallbackGroupType::MutuallyExclusive, false);
   initParameters();
@@ -552,6 +556,8 @@ AmclNode::initialPoseReceived(geometry_msgs::msg::PoseWithCovarianceStamped::Sha
 void
 AmclNode::handleInitialPose(geometry_msgs::msg::PoseWithCovarianceStamped & msg)
 {
+  // 中文注释：初始位姿会重置粒子云分布，是 AMCL 从全局不确定进入局部跟踪的入口。
+  // 如果消息时间戳较旧，会先补偿这段时间内的里程计运动。
   std::lock_guard<std::recursive_mutex> cfl(mutex_);
   // In case the client sent us a pose estimate in the past, integrate the
   // intervening odometric change.
@@ -617,6 +623,8 @@ AmclNode::handleInitialPose(geometry_msgs::msg::PoseWithCovarianceStamped & msg)
 void
 AmclNode::laserReceived(sensor_msgs::msg::LaserScan::ConstSharedPtr laser_scan)
 {
+  // 中文注释：每帧激光到达后，AMCL 先用 odom 运动模型预测粒子，再用激光模型
+  // 根据地图匹配结果更新权重，必要时重采样并发布 map->odom。
   std::lock_guard<std::recursive_mutex> cfl(mutex_);
 
   // Since the sensor data is continually being published by the simulator or robot,
@@ -1379,6 +1387,8 @@ AmclNode::dynamicParametersCallback(
 void
 AmclNode::mapReceived(const nav_msgs::msg::OccupancyGrid::SharedPtr msg)
 {
+  // 中文注释：地图回调只负责消息校验和 first_map_only 策略；
+  // 真正的 OccupancyGrid 到 AMCL 内部地图结构转换在 handleMapMessage 中完成。
   RCLCPP_DEBUG(get_logger(), "AmclNode: A new map was received.");
   if (!nav2_util::validateMsg(*msg)) {
     RCLCPP_ERROR(get_logger(), "Received map message is malformed. Rejecting.");

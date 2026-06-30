@@ -16,6 +16,8 @@
 
 #include "nav2_behavior_tree/plugins/condition/is_battery_charging_condition.hpp"
 
+#include "spdlog_wrapper.hpp"
+
 namespace nav2_behavior_tree
 {
 
@@ -26,6 +28,7 @@ IsBatteryChargingCondition::IsBatteryChargingCondition(
   battery_topic_("/battery_status"),
   is_battery_charging_(false)
 {
+  LOG_TRACE("BT plugin function entry: IsBatteryChargingCondition::IsBatteryChargingCondition");
   getInput("battery_topic", battery_topic_);
   auto node = config().blackboard->get<rclcpp::Node::SharedPtr>("node");
   callback_group_ = node->create_callback_group(
@@ -44,6 +47,7 @@ IsBatteryChargingCondition::IsBatteryChargingCondition(
 
 BT::NodeStatus IsBatteryChargingCondition::tick()
 {
+  LOG_TRACE("BT plugin function entry: IsBatteryChargingCondition::tick");
   callback_group_executor_.spin_some();
   if (is_battery_charging_) {
     return BT::NodeStatus::SUCCESS;
@@ -53,6 +57,7 @@ BT::NodeStatus IsBatteryChargingCondition::tick()
 
 void IsBatteryChargingCondition::batteryCallback(sensor_msgs::msg::BatteryState::SharedPtr msg)
 {
+  LOG_TRACE("BT plugin function entry: IsBatteryChargingCondition::batteryCallback");
   is_battery_charging_ =
     (msg->power_supply_status == sensor_msgs::msg::BatteryState::POWER_SUPPLY_STATUS_CHARGING);
 }
@@ -62,5 +67,6 @@ void IsBatteryChargingCondition::batteryCallback(sensor_msgs::msg::BatteryState:
 #include "behaviortree_cpp_v3/bt_factory.h"
 BT_REGISTER_NODES(factory)
 {
+  LOG_INFO("Registering BT plugin nodes from nav2_ws/src/navigation2/nav2_behavior_tree/plugins/condition/is_battery_charging_condition.cpp");
   factory.registerNodeType<nav2_behavior_tree::IsBatteryChargingCondition>("IsBatteryCharging");
 }

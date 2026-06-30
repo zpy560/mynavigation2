@@ -21,6 +21,8 @@
 
 #include "nav2_behavior_tree/plugins/action/get_pose_from_path_action.hpp"
 
+#include "spdlog_wrapper.hpp"
+
 namespace nav2_behavior_tree
 {
 
@@ -29,10 +31,12 @@ GetPoseFromPath::GetPoseFromPath(
   const BT::NodeConfiguration & conf)
 : BT::ActionNodeBase(name, conf)
 {
+  LOG_TRACE("BT plugin function entry: GetPoseFromPath::GetPoseFromPath");
 }
 
 inline BT::NodeStatus GetPoseFromPath::tick()
 {
+  LOG_TRACE("BT plugin function entry: GetPoseFromPath::tick");
   setStatus(BT::NodeStatus::RUNNING);
 
   nav_msgs::msg::Path input_path;
@@ -75,5 +79,6 @@ inline BT::NodeStatus GetPoseFromPath::tick()
 #include "behaviortree_cpp_v3/bt_factory.h"
 BT_REGISTER_NODES(factory)
 {
+  LOG_INFO("Registering BT plugin nodes from nav2_ws/src/navigation2/nav2_behavior_tree/plugins/action/get_pose_from_path_action.cpp");
   factory.registerNodeType<nav2_behavior_tree::GetPoseFromPath>("GetPoseFromPath");
 }

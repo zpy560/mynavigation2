@@ -17,6 +17,8 @@
 #include <vector>
 #include <fstream>
 
+#include "rcpputils/filesystem_helper.hpp"
+
 #include "nav2_route/plugins/graph_file_loaders/geojson_graph_file_loader.hpp"
 
 namespace nav2_route
@@ -66,7 +68,7 @@ bool GeoJsonGraphFileLoader::loadGraphFromFile(
 
 bool GeoJsonGraphFileLoader::doesFileExist(const std::string & filepath)
 {
-  return std::filesystem::exists(filepath);
+  return rcpputils::fs::exists(filepath);
 }
 
 void GeoJsonGraphFileLoader::getGraphElements(

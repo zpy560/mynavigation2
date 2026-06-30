@@ -21,6 +21,8 @@
 
 #include "nav2_behavior_tree/plugins/condition/goal_reached_condition.hpp"
 
+#include "spdlog_wrapper.hpp"
+
 namespace nav2_behavior_tree
 {
 
@@ -32,17 +34,20 @@ GoalReachedCondition::GoalReachedCondition(
   global_frame_("map"),
   robot_base_frame_("base_link")
 {
+  LOG_TRACE("BT plugin function entry: GoalReachedCondition::GoalReachedCondition");
   getInput("global_frame", global_frame_);
   getInput("robot_base_frame", robot_base_frame_);
 }
 
 GoalReachedCondition::~GoalReachedCondition()
 {
+  LOG_TRACE("BT plugin function entry: GoalReachedCondition::~GoalReachedCondition");
   cleanup();
 }
 
 BT::NodeStatus GoalReachedCondition::tick()
 {
+  LOG_TRACE("BT plugin function entry: GoalReachedCondition::tick");
   if (!initialized_) {
     initialize();
   }
@@ -55,6 +60,7 @@ BT::NodeStatus GoalReachedCondition::tick()
 
 void GoalReachedCondition::initialize()
 {
+  LOG_TRACE("BT plugin function entry: GoalReachedCondition::initialize");
   node_ = config().blackboard->get<rclcpp::Node::SharedPtr>("node");
 
   nav2_util::declare_parameter_if_not_declared(
@@ -70,11 +76,13 @@ void GoalReachedCondition::initialize()
 
 bool GoalReachedCondition::isGoalReached()
 {
+  LOG_TRACE("BT plugin function entry: GoalReachedCondition::isGoalReached");
   geometry_msgs::msg::PoseStamped current_pose;
 
   if (!nav2_util::getCurrentPose(
       current_pose, *tf_, global_frame_, robot_base_frame_, transform_tolerance_))
   {
+  LOG_TRACE("BT plugin function entry: nav2_util::getCurrentPose");
     RCLCPP_DEBUG(node_->get_logger(), "Current robot pose is not available.");
     return false;
   }
@@ -92,5 +100,6 @@ bool GoalReachedCondition::isGoalReached()
 #include "behaviortree_cpp_v3/bt_factory.h"
 BT_REGISTER_NODES(factory)
 {
+  LOG_INFO("Registering BT plugin nodes from nav2_ws/src/navigation2/nav2_behavior_tree/plugins/condition/goal_reached_condition.cpp");
   factory.registerNodeType<nav2_behavior_tree::GoalReachedCondition>("GoalReached");
 }

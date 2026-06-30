@@ -15,7 +15,7 @@
           </RecoveryNode>
         </RateController>
         <RecoveryNode number_of_retries="1" name="FollowPath">
-          <FollowPath path="{path}" controller_id="FollowPath"/>
+          <FollowPath path="{path}" controller_id=""/>
           <ClearEntireCostmap name="ClearLocalCostmap-Context" service_name="local_costmap/clear_entirely_local_costmap"/>
         </RecoveryNode>
       </PipelineSequence>
@@ -34,3 +34,18 @@
     </RecoveryNode>
   </BehaviorTree>
 </root>
+
+<!--
+中文说明：
+1. 这是默认的单目标点导航行为树，输入来自 /navigate_to_pose action 或 goal_pose topic，
+   NavigateToPoseNavigator 会把目标位姿写入 blackboard["goal"]。
+2. 主流程由 NavigateRecovery 包裹，最多允许 6 轮系统级恢复；内部 PipelineSequence 让
+   ComputePathToPose 与 FollowPath 形成流水线，机器人跟踪当前路径时仍可周期性重规划。
+3. RateController 以 1Hz tick 规划分支，ComputePathToPose 从 blackboard 读取 {goal}，
+   调用 /compute_path_to_pose action；成功后把 nav_msgs/Path 写回 blackboard["path"]。
+4. FollowPath 从 blackboard 读取 {path}，调用 /follow_path action；controller_server
+   根据局部代价地图、TF、里程计和控制器插件输出速度指令。
+5. 如果规划失败，先清理 global_costmap 后重试；如果控制失败，先清理 local_costmap 后重试。
+6. 如果局部恢复仍失败，RecoveryFallback 会先检查 GoalUpdated，若目标已更新则终止当前恢复；
+   否则按 RoundRobin 顺序执行清理代价地图、原地旋转、等待、后退，再回到主导航流程重试。
+-->

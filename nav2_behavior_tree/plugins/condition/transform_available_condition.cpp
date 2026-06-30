@@ -20,6 +20,8 @@
 
 using namespace std::chrono_literals; // NOLINT
 
+#include "spdlog_wrapper.hpp"
+
 namespace nav2_behavior_tree
 {
 
@@ -29,6 +31,7 @@ TransformAvailableCondition::TransformAvailableCondition(
 : BT::ConditionNode(condition_name, conf),
   was_found_(false)
 {
+  LOG_TRACE("BT plugin function entry: TransformAvailableCondition::TransformAvailableCondition");
   node_ = config().blackboard->get<rclcpp::Node::SharedPtr>("node");
   tf_ = config().blackboard->get<std::shared_ptr<tf2_ros::Buffer>>("tf_buffer");
 
@@ -47,11 +50,13 @@ TransformAvailableCondition::TransformAvailableCondition(
 
 TransformAvailableCondition::~TransformAvailableCondition()
 {
+  LOG_TRACE("BT plugin function entry: TransformAvailableCondition::~TransformAvailableCondition");
   RCLCPP_DEBUG(node_->get_logger(), "Shutting down TransformAvailableCondition BT node");
 }
 
 BT::NodeStatus TransformAvailableCondition::tick()
 {
+  LOG_TRACE("BT plugin function entry: TransformAvailableCondition::tick");
   if (was_found_) {
     return BT::NodeStatus::SUCCESS;
   }
@@ -77,5 +82,6 @@ BT::NodeStatus TransformAvailableCondition::tick()
 #include "behaviortree_cpp_v3/bt_factory.h"
 BT_REGISTER_NODES(factory)
 {
+  LOG_INFO("Registering BT plugin nodes from nav2_ws/src/navigation2/nav2_behavior_tree/plugins/condition/transform_available_condition.cpp");
   factory.registerNodeType<nav2_behavior_tree::TransformAvailableCondition>("TransformAvailable");
 }
