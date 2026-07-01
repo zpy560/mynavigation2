@@ -7,9 +7,9 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 
 
 def generate_launch_description():
-    bringup_dir = get_package_share_directory('myworld_bringup')
+    bringup_dir = get_package_share_directory('myagv_test_bringup')
     launch_file = os.path.join(
-        bringup_dir, 'launch', 'myworld.launch.py')
+        bringup_dir, 'launch', 'myagv_test.launch.py')
 
     return LaunchDescription([
         IncludeLaunchDescription(PythonLaunchDescriptionSource(launch_file)),
