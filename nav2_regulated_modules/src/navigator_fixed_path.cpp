@@ -7,6 +7,7 @@
 #include <optional>
 
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
+#include "visualization_msgs/msg/marker.hpp"
 
 namespace nav2_regulated_modules
 {
@@ -128,7 +129,48 @@ void RegulatedNavigator::handleNavigationServiceAccepted(const std::shared_ptr<N
   task_.last_progress_time = task_.start_time;
   task_.last_progress_pose = geometry_msgs::msg::PoseStamped();
   LOG_INFO("接受 NavigationService Action，generation={}，task_id={}，frame={}，路径点数={}，总长度={:.3f}m", task_.generation, task_.task_id, prepared_path->header.frame_id, prepared_path->poses.size(), task_.total_path_length);
+  publishFixedPath(task_.active_path);
   sendFollowPath(*prepared_path);
+}
+
+void RegulatedNavigator::publishFixedPath(const nav_msgs::msg::Path & path) {
+  if (!fixed_path_pub_ || !fixed_path_pub_->is_activated() || !fixed_path_boundaries_pub_ || !fixed_path_boundaries_pub_->is_activated()) {
+    LOG_WARN("固定路径可视化发布器未激活，跳过发布");
+    return;
+  }
+  if (path.poses.empty()) {
+    LOG_WARN("固定路径为空，跳过 RViz2 可视化发布");
+    return;
+  }
+  auto visualization_path = path;
+  visualization_path.header.stamp = now();
+  for (auto & pose : visualization_path.poses) {pose.header = visualization_path.header;}
+  fixed_path_pub_->publish(visualization_path);
+  visualization_msgs::msg::MarkerArray boundaries;
+  const auto make_line = [&visualization_path](const int id, const double lateral_offset, const double height, const double width, const float red, const float green, const float blue, const float alpha) {visualization_msgs::msg::Marker marker; marker.header = visualization_path.header; marker.ns = "fixed_path_tech_boundaries"; marker.id = id; marker.type = visualization_msgs::msg::Marker::LINE_STRIP; marker.action = visualization_msgs::msg::Marker::ADD; marker.pose.orientation.w = 1.0; marker.scale.x = width; marker.color.r = red; marker.color.g = green; marker.color.b = blue; marker.color.a = alpha; marker.frame_locked = true; marker.points.reserve(visualization_path.poses.size()); for (std::size_t index = 0; index < visualization_path.poses.size(); ++index) {const std::size_t previous_index = index == 0 ? 0 : index - 1; const std::size_t next_index = index + 1 < visualization_path.poses.size() ? index + 1 : index; const auto & previous = visualization_path.poses[previous_index].pose.position; const auto & next = visualization_path.poses[next_index].pose.position; const auto & current = visualization_path.poses[index].pose.position; const double tangent_x = next.x - previous.x; const double tangent_y = next.y - previous.y; const double tangent_length = std::hypot(tangent_x, tangent_y); geometry_msgs::msg::Point point; point.x = current.x; point.y = current.y; point.z = height; if (tangent_length > 1e-9) {point.x -= lateral_offset * tangent_y / tangent_length; point.y += lateral_offset * tangent_x / tangent_length;} marker.points.push_back(point);} return marker;};
+  boundaries.markers.push_back(make_line(0, fixed_path_boundary_half_width_, 0.035, 0.14, 0.0F, 0.55F, 1.0F, 0.20F));
+  boundaries.markers.push_back(make_line(1, -fixed_path_boundary_half_width_, 0.035, 0.14, 0.45F, 0.0F, 1.0F, 0.20F));
+  boundaries.markers.push_back(make_line(2, fixed_path_boundary_half_width_, 0.055, 0.035, 0.0F, 0.95F, 1.0F, 1.0F));
+  boundaries.markers.push_back(make_line(3, -fixed_path_boundary_half_width_, 0.055, 0.035, 0.75F, 0.20F, 1.0F, 1.0F));
+  visualization_msgs::msg::Marker nodes;
+  nodes.header = visualization_path.header;
+  nodes.ns = "fixed_path_tech_nodes";
+  nodes.id = 4;
+  nodes.type = visualization_msgs::msg::Marker::SPHERE_LIST;
+  nodes.action = visualization_msgs::msg::Marker::ADD;
+  nodes.pose.orientation.w = 1.0;
+  nodes.scale.x = 0.07;
+  nodes.scale.y = 0.07;
+  nodes.scale.z = 0.07;
+  nodes.color.r = 0.35F;
+  nodes.color.g = 0.95F;
+  nodes.color.b = 1.0F;
+  nodes.color.a = 0.9F;
+  nodes.frame_locked = true;
+  for (std::size_t index = 0; index < visualization_path.poses.size(); index += 5) {const auto left_point = boundaries.markers[2].points[index]; const auto right_point = boundaries.markers[3].points[index]; nodes.points.push_back(left_point); nodes.points.push_back(right_point);}
+  boundaries.markers.push_back(std::move(nodes));
+  fixed_path_boundaries_pub_->publish(boundaries);
+  LOG_INFO("固定路径与科技风边界已发布到 RViz2，path_topic={}，boundaries_topic={}，frame={}，路径点数={}，左右半宽={:.2f}m", fixed_path_visualization_topic_, fixed_path_boundaries_topic_, visualization_path.header.frame_id, visualization_path.poses.size(), fixed_path_boundary_half_width_);
 }
 
 void RegulatedNavigator::resumeCurrentTask() {
@@ -138,6 +180,7 @@ void RegulatedNavigator::resumeCurrentTask() {
       return;
     }
     LOG_INFO("恢复固定路径任务，generation={}，路径点数={}", task_.generation, task_.active_path.poses.size());
+    publishFixedPath(task_.active_path);
     sendFollowPath(task_.active_path);
     return;
   }

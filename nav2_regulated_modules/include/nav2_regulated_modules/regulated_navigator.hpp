@@ -30,6 +30,7 @@
 #include "spdlog_wrapper.hpp"
 #include "tf2_ros/buffer.h"
 #include "tf2_ros/transform_listener.h"
+#include "visualization_msgs/msg/marker_array.hpp"
 
 namespace nav2_regulated_modules
 {
@@ -88,6 +89,7 @@ private:
   void handlePlanningFailure(const std::string & reason);
 
   void sendFollowPath(const nav_msgs::msg::Path & path);
+  void publishFixedPath(const nav_msgs::msg::Path & path);
   bool isCurrentFollow(uint64_t generation, uint64_t sequence) const;
   void stopRobot();
   void onControllerVelocity(const geometry_msgs::msg::Twist::SharedPtr velocity);
@@ -126,6 +128,8 @@ private:
   std::string robot_base_frame_;
   std::string goal_topic_;
   std::string navigation_service_action_;
+  std::string fixed_path_visualization_topic_;
+  std::string fixed_path_boundaries_topic_;
   std::string controller_cmd_vel_topic_;
   std::string smoothed_cmd_vel_topic_;
   std::string velocity_odom_topic_;
@@ -145,6 +149,7 @@ private:
   bool check_smoother_collisions_{true};
   double current_speed_{0.0};
   double fixed_path_step_{0.1};
+  double fixed_path_boundary_half_width_{0.4};
   double velocity_log_frequency_{1.0};
 
   rclcpp::Time last_valid_tf_time_{0, 0, RCL_ROS_TIME};
@@ -184,6 +189,8 @@ private:
   rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr smoothed_velocity_sub_;
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr velocity_odom_sub_;
   rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr stop_cmd_pub_;
+  rclcpp_lifecycle::LifecyclePublisher<nav_msgs::msg::Path>::SharedPtr fixed_path_pub_;
+  rclcpp_lifecycle::LifecyclePublisher<visualization_msgs::msg::MarkerArray>::SharedPtr fixed_path_boundaries_pub_;
   rclcpp::TimerBase::SharedPtr feedback_timer_;
   rclcpp::TimerBase::SharedPtr monitor_timer_;
   rclcpp::TimerBase::SharedPtr velocity_log_timer_;

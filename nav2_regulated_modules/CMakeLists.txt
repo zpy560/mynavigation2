@@ -55,6 +55,7 @@ ament_target_dependencies(regulated_navigator_node
   tf2_ros
   tf2_geometry_msgs
   spdlog_wrapper
+  visualization_msgs
 )
 
 add_executable(collision_boundary_visualizer_node src/collision_boundary_visualizer.cpp)

@@ -16,6 +16,9 @@ RegulatedNavigator::RegulatedNavigator(const rclcpp::NodeOptions & options) : na
   declare_parameter("operation_mode", "autonomous");
   declare_parameter("goal_topic", "goal_pose");
   declare_parameter("navigation_service_action", "navigation_service");
+  declare_parameter("fixed_path_visualization_topic", "fixed_path_plan");
+  declare_parameter("fixed_path_boundaries_topic", "fixed_path_boundaries");
+  declare_parameter("fixed_path_boundary_half_width", 0.4);
   declare_parameter("navigate_to_pose_action", "navigate_to_pose");
   declare_parameter("navigate_through_poses_action", "navigate_through_poses");
   declare_parameter("compute_path_to_pose_action", "compute_path_to_pose");
@@ -68,6 +71,8 @@ nav2_util::CallbackReturn RegulatedNavigator::on_configure(const rclcpp_lifecycl
   }
   goal_topic_ = get_parameter("goal_topic").as_string();
   navigation_service_action_ = get_parameter("navigation_service_action").as_string();
+  fixed_path_visualization_topic_ = get_parameter("fixed_path_visualization_topic").as_string();
+  fixed_path_boundaries_topic_ = get_parameter("fixed_path_boundaries_topic").as_string();
   server_timeout_ = get_parameter("server_timeout").as_double();
   cancel_timeout_ = get_parameter("cancel_timeout").as_double();
   smoothing_duration_ = get_parameter("max_smoothing_duration").as_double();
@@ -83,12 +88,17 @@ nav2_util::CallbackReturn RegulatedNavigator::on_configure(const rclcpp_lifecycl
   localization_recovery_timeout_ = get_parameter("localization_recovery_timeout").as_double();
   localization_stable_duration_ = get_parameter("localization_stable_duration").as_double();
   fixed_path_step_ = get_parameter("fixed_path_step").as_double();
+  fixed_path_boundary_half_width_ = get_parameter("fixed_path_boundary_half_width").as_double();
   controller_cmd_vel_topic_ = get_parameter("controller_cmd_vel_topic").as_string();
   smoothed_cmd_vel_topic_ = get_parameter("smoothed_cmd_vel_topic").as_string();
   velocity_odom_topic_ = get_parameter("velocity_odom_topic").as_string();
   velocity_log_frequency_ = get_parameter("velocity_log_frequency").as_double();
   if (!std::isfinite(fixed_path_step_) || fixed_path_step_ <= 0.0) {
     LOG_ERROR("fixed_path_step 必须为有限正数，当前值={}", fixed_path_step_);
+    return nav2_util::CallbackReturn::FAILURE;
+  }
+  if (!std::isfinite(fixed_path_boundary_half_width_) || fixed_path_boundary_half_width_ <= 0.0) {
+    LOG_ERROR("fixed_path_boundary_half_width 必须为有限正数，当前值={}", fixed_path_boundary_half_width_);
     return nav2_util::CallbackReturn::FAILURE;
   }
   if (!std::isfinite(velocity_log_frequency_) || velocity_log_frequency_ <= 0.0) {
@@ -112,6 +122,8 @@ nav2_util::CallbackReturn RegulatedNavigator::on_configure(const rclcpp_lifecycl
   goal_sub_ = create_subscription<geometry_msgs::msg::PoseStamped>(goal_topic_, rclcpp::SystemDefaultsQoS(), std::bind(&RegulatedNavigator::onTopicGoal, this, std::placeholders::_1));
   if (operation_mode_ == NavigationMode::FIXED_PATH) {
     navigation_service_server_ = rclcpp_action::create_server<NavigationService>(this, navigation_service_action_, std::bind(&RegulatedNavigator::handleNavigationServiceGoal, this, std::placeholders::_1, std::placeholders::_2), std::bind(&RegulatedNavigator::handleNavigationServiceCancel, this, std::placeholders::_1), std::bind(&RegulatedNavigator::handleNavigationServiceAccepted, this, std::placeholders::_1));
+    fixed_path_pub_ = create_publisher<nav_msgs::msg::Path>(fixed_path_visualization_topic_, rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local());
+    fixed_path_boundaries_pub_ = create_publisher<visualization_msgs::msg::MarkerArray>(fixed_path_boundaries_topic_, rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local());
   }
   stop_cmd_pub_ = create_publisher<geometry_msgs::msg::Twist>(get_parameter("stop_cmd_vel_topic").as_string(), rclcpp::SystemDefaultsQoS());
   const auto velocity_qos = rclcpp::QoS(rclcpp::KeepLast(10)).best_effort();
@@ -133,6 +145,8 @@ nav2_util::CallbackReturn RegulatedNavigator::on_configure(const rclcpp_lifecycl
 }
 
 nav2_util::CallbackReturn RegulatedNavigator::on_activate(const rclcpp_lifecycle::State &) {
+  if (fixed_path_pub_) {fixed_path_pub_->on_activate();}
+  if (fixed_path_boundaries_pub_) {fixed_path_boundaries_pub_->on_activate();}
   active_ = true;
   createBond();
   LOG_INFO("独立规控导航器已激活");
@@ -142,6 +156,8 @@ nav2_util::CallbackReturn RegulatedNavigator::on_activate(const rclcpp_lifecycle
 nav2_util::CallbackReturn RegulatedNavigator::on_deactivate(const rclcpp_lifecycle::State &) {
   active_ = false;
   cancelTask("节点停用");
+  if (fixed_path_pub_) {fixed_path_pub_->on_deactivate();}
+  if (fixed_path_boundaries_pub_) {fixed_path_boundaries_pub_->on_deactivate();}
   destroyBond();
   LOG_INFO("独立规控导航器已停用");
   return nav2_util::CallbackReturn::SUCCESS;
@@ -163,6 +179,8 @@ nav2_util::CallbackReturn RegulatedNavigator::on_cleanup(const rclcpp_lifecycle:
   smoothed_velocity_sub_.reset();
   velocity_odom_sub_.reset();
   stop_cmd_pub_.reset();
+  fixed_path_pub_.reset();
+  fixed_path_boundaries_pub_.reset();
   feedback_timer_.reset();
   monitor_timer_.reset();
   velocity_log_timer_.reset();

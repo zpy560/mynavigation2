@@ -101,6 +101,9 @@ regulated_navigator:
     operation_mode: "autonomous"
     goal_topic: "goal_pose"
     navigation_service_action: "navigation_service"
+    fixed_path_visualization_topic: "fixed_path_plan"
+    fixed_path_boundaries_topic: "fixed_path_boundaries"
+    fixed_path_boundary_half_width: 0.40
     navigate_to_pose_action: "navigate_to_pose"
     navigate_through_poses_action: "navigate_through_poses"
     compute_path_to_pose_action: "compute_path_to_pose"
@@ -134,7 +137,7 @@ regulated_navigator:
 controller_server:
   ros__parameters:
     use_sim_time: false
-    controller_frequency: 20.0
+    controller_frequency: 50.0
     odom_topic: "/odometry"
     min_x_velocity_threshold: 0.001
     min_y_velocity_threshold: 0.5
@@ -387,7 +390,7 @@ smoother_server:
 velocity_smoother:
   ros__parameters:
     use_sim_time: false
-    smoothing_frequency: 20.0
+    smoothing_frequency: 50.0
     scale_velocities: false
     feedback: "CLOSED_LOOP"
     max_velocity: [0.52, 0.0, 2.0]
