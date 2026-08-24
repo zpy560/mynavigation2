@@ -601,7 +601,7 @@ ros2 action send_goal /navigation_service \
 #### 三段连续路径示例
 
 以下 Goal 由“直线＋三次贝塞尔曲线＋直线”构成三段连续路径。第一段终点
-`(-13.8, -12.0)` 同时是曲线起点，曲线终点 `(17.9, -16.0)` 同时是第三段起点：
+`(14.8, -12.0)` 同时是曲线起点，曲线终点 `(17.9, -16.0)` 同时是第三段起点：
 
 ```bash
 ros2 action send_goal /navigation_service \
