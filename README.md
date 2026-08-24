@@ -598,6 +598,49 @@ ros2 action send_goal /navigation_service \
   ]}" --feedback
 ```
 
+#### 三段连续路径示例
+
+以下 Goal 由“直线＋三次贝塞尔曲线＋直线”构成三段连续路径。第一段终点
+`(-13.8, -12.0)` 同时是曲线起点，曲线终点 `(17.9, -16.0)` 同时是第三段起点：
+
+```bash
+ros2 action send_goal /navigation_service \
+  byd_custom_msgs/action/NavigationService \
+  "{task_id: demo_three_segments, navi_segment: [
+    {
+      segment_type: 1,
+      segment_name: line_1,
+      segment_id: segment_1,
+      node1: {x: 9.3, y: -12.0, z: 0.0},
+      node2: {x: 14.8, y: -12.0, z: 0.0},
+      control_pos1: {x: 0.0, y: 0.0, z: 0.0},
+      control_pos2: {x: 0.0, y: 0.0, z: 0.0}
+    },
+    {
+      segment_type: 2,
+      segment_name: bezier_1,
+      segment_id: segment_2,
+      node1: {x: 14.8, y: -12.0, z: 0.0},
+      node2: {x: 17.9, y: -16.0, z: 0.0},
+      control_pos1: {x: 16.9, y: -12.0, z: 0.0},
+      control_pos2: {x: 18.0, y: -13.9, z: 0.0}
+    },
+    {
+      segment_type: 1,
+      segment_name: line_2,
+      segment_id: segment_3,
+      node1: {x: 17.9, y: -16.0, z: 0.0},
+      node2: {x: 17.9, y: -20.6, z: 0.0},
+      control_pos1: {x: 0.0, y: 0.0, z: 0.0},
+      control_pos2: {x: 0.0, y: 0.0, z: 0.0}
+    }
+  ]}" \
+  --feedback
+```
+
+其中 `segment_type: 1` 表示直线段，`segment_type: 2` 表示依次经过
+`node1/control_pos1/control_pos2/node2` 的三次贝塞尔段。
+
 #### 8.6.1 指定直线段路径点簇
 
 下面给出一条从 `(70.1, -12.4)` 到 `(63.8, -12.1)` 的固定直线段路径，坐标系为 `map`。线段长度约为

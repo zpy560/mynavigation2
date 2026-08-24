@@ -32,8 +32,8 @@ public:
   {
     parent_frame_ = declare_parameter<std::string>("parent_frame", "map");
     child_frame_ = declare_parameter<std::string>("child_frame", "base_link");
-    x_ = declare_parameter<double>("x", 70.100000);
-    y_ = declare_parameter<double>("y", -12.400000);
+    x_ = declare_parameter<double>("x", 9.300000);
+    y_ = declare_parameter<double>("y", -12.000000);
     z_ = declare_parameter<double>("z", 0.0);
     yaw_ = declare_parameter<double>("yaw", 3.094010164837);
     tf_time_offset_ = declare_parameter<double>("tf_time_offset", 0.0);
