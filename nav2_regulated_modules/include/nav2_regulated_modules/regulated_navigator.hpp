@@ -23,6 +23,7 @@
 #include "nav2_regulated_modules/navigation_state.hpp"
 #include "nav2_regulated_modules/planning_module.hpp"
 #include "nav2_util/lifecycle_node.hpp"
+#include "nav2_msgs/msg/speed_limit.hpp"
 #include "nav_msgs/msg/odometry.hpp"
 #include "nav_msgs/msg/path.hpp"
 #include "rclcpp/rclcpp.hpp"
@@ -81,6 +82,7 @@ private:
   double findTfromArcLength(const std::vector<double> & arc_lengths, const std::vector<double> & ts, double target_length);
   void generateBezierUniformPoints(const nav_msgs::msg::Path & input_path, double interval, nav_msgs::msg::Path & output_path);
   void publishFeedback();
+  void publishSpeedLimit(const std::shared_ptr<NavigationServiceHandle> goal);
 
   bool dependenciesReady();
   void startPlanning(bool replanning);
@@ -133,6 +135,7 @@ private:
   std::string controller_cmd_vel_topic_;
   std::string smoothed_cmd_vel_topic_;
   std::string velocity_odom_topic_;
+  std::string speed_limit_topic_;
   double server_timeout_{5.0};
   double cancel_timeout_{2.0};
   double smoothing_duration_{2.0};
@@ -188,6 +191,7 @@ private:
   rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr controller_velocity_sub_;
   rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr smoothed_velocity_sub_;
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr velocity_odom_sub_;
+  rclcpp::Publisher<nav2_msgs::msg::SpeedLimit>::SharedPtr speed_limit_pub_;
   rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr stop_cmd_pub_;
   rclcpp_lifecycle::LifecyclePublisher<nav_msgs::msg::Path>::SharedPtr fixed_path_pub_;
   rclcpp_lifecycle::LifecyclePublisher<visualization_msgs::msg::MarkerArray>::SharedPtr fixed_path_boundaries_pub_;

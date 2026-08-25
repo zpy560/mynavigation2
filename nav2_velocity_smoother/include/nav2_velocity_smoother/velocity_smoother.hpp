@@ -28,6 +28,7 @@
 #include "nav2_util/robot_utils.hpp"
 // spdlog wrapper for module-specific logging
 #include "spdlog_wrapper.hpp"
+#include "nav2_msgs/msg/speed_limit.hpp"
 
 namespace nav2_velocity_smoother
 {
@@ -114,6 +115,12 @@ protected:
   void smootherTimer();
 
   /**
+  * @brief Callback for speed limiting messages
+  * @param msg Shared pointer to nav2_msgs::msg::SpeedLimit
+  */
+  void speedLimitCallback(const nav2_msgs::msg::SpeedLimit::SharedPtr msg);
+
+  /**
    * @brief Dynamic reconfigure callback
    */
   rcl_interfaces::msg::SetParametersResult dynamicParametersCallback(std::vector<rclcpp::Parameter> parameters);
@@ -122,6 +129,7 @@ protected:
   std::unique_ptr<nav2_util::OdomSmoother> odom_smoother_;
   rclcpp_lifecycle::LifecyclePublisher<geometry_msgs::msg::Twist>::SharedPtr smoothed_cmd_pub_;
   rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmd_sub_;
+  rclcpp::Subscription<nav2_msgs::msg::SpeedLimit>::SharedPtr speed_limit_sub_;
   rclcpp::TimerBase::SharedPtr timer_;
 
   rclcpp::Clock::SharedPtr clock_;
@@ -137,6 +145,9 @@ protected:
   bool scale_velocities_;
   std::vector<double> max_velocities_;
   std::vector<double> min_velocities_;
+  double target_maxvx_;
+  double target_minvx_;
+  bool limitv2target{false};
   std::vector<double> max_accels_;
   std::vector<double> max_decels_;
   std::vector<double> deadband_velocities_;

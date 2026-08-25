@@ -614,7 +614,9 @@ ros2 action send_goal /navigation_service \
       node1: {x: 9.3, y: -12.0, z: 0.0},
       node2: {x: 14.8, y: -12.0, z: 0.0},
       control_pos1: {x: 0.0, y: 0.0, z: 0.0},
-      control_pos2: {x: 0.0, y: 0.0, z: 0.0}
+      control_pos2: {x: 0.0, y: 0.0, z: 0.0},
+      motion_direction: 1,
+      max_speed: 0.7
     },
     {
       segment_type: 2,
