@@ -53,6 +53,7 @@ RegulatedNavigator::RegulatedNavigator(const rclcpp::NodeOptions & options) : na
   declare_parameter("smoothed_cmd_vel_topic", "cmd_vel");
   declare_parameter("velocity_odom_topic", "/odometry");
   declare_parameter("velocity_log_frequency", 1.0);
+  declare_parameter<std::string>("speed_limit_topic", "speed_limit");
 }
 
 nav2_util::CallbackReturn RegulatedNavigator::on_configure(const rclcpp_lifecycle::State &) {
@@ -92,6 +93,7 @@ nav2_util::CallbackReturn RegulatedNavigator::on_configure(const rclcpp_lifecycl
   controller_cmd_vel_topic_ = get_parameter("controller_cmd_vel_topic").as_string();
   smoothed_cmd_vel_topic_ = get_parameter("smoothed_cmd_vel_topic").as_string();
   velocity_odom_topic_ = get_parameter("velocity_odom_topic").as_string();
+  speed_limit_topic_ = get_parameter("speed_limit_topic").as_string();
   velocity_log_frequency_ = get_parameter("velocity_log_frequency").as_double();
   if (!std::isfinite(fixed_path_step_) || fixed_path_step_ <= 0.0) {
     LOG_ERROR("fixed_path_step 必须为有限正数，当前值={}", fixed_path_step_);
@@ -130,6 +132,7 @@ nav2_util::CallbackReturn RegulatedNavigator::on_configure(const rclcpp_lifecycl
   controller_velocity_sub_ = create_subscription<geometry_msgs::msg::Twist>(controller_cmd_vel_topic_, velocity_qos, std::bind(&RegulatedNavigator::onControllerVelocity, this, std::placeholders::_1));
   smoothed_velocity_sub_ = create_subscription<geometry_msgs::msg::Twist>(smoothed_cmd_vel_topic_, velocity_qos, std::bind(&RegulatedNavigator::onSmoothedVelocity, this, std::placeholders::_1));
   velocity_odom_sub_ = create_subscription<nav_msgs::msg::Odometry>(velocity_odom_topic_, velocity_qos, std::bind(&RegulatedNavigator::onVelocityOdometry, this, std::placeholders::_1));
+  speed_limit_pub_ = this->create_publisher<nav2_msgs::msg::SpeedLimit>( speed_limit_topic_, rclcpp::QoS(10));
 
   tf_buffer_ = std::make_unique<tf2_ros::Buffer>(get_clock());
   tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);

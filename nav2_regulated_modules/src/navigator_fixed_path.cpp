@@ -130,6 +130,7 @@ void RegulatedNavigator::handleNavigationServiceAccepted(const std::shared_ptr<N
   task_.last_progress_pose = geometry_msgs::msg::PoseStamped();
   LOG_INFO("接受 NavigationService Action，generation={}，task_id={}，frame={}，路径点数={}，总长度={:.3f}m", task_.generation, task_.task_id, prepared_path->header.frame_id, prepared_path->poses.size(), task_.total_path_length);
   publishFixedPath(task_.active_path);
+  publishSpeedLimit(goal);
   sendFollowPath(*prepared_path);
 }
 
@@ -296,6 +297,18 @@ void RegulatedNavigator::generateBezierUniformPoints(const nav_msgs::msg::Path &
   const auto & last_position = output_path.poses.back().pose.position;
   const auto & end_position = input_path.poses.back().pose.position;
   if (last_position.x != end_position.x || last_position.y != end_position.y) {output_path.poses.push_back(bezier3(input_path, 1.0, true));}
+}
+
+void RegulatedNavigator::publishSpeedLimit(const std::shared_ptr<NavigationServiceHandle> goal)
+{
+  auto msg = nav2_msgs::msg::SpeedLimit();
+  msg.header.stamp = this->now();
+  msg.header.frame_id = "base_link";
+  // 不使用百分比模式（与订阅端逻辑对应：percentage 为 true 会报错）
+  msg.percentage = false;
+  auto line = goal->get_goal()->navi_segment[0];
+  msg.speed_limit = -2*(line.motion_direction - 1.5)*line.max_speed;
+  speed_limit_pub_->publish(msg);
 }
 
 }  // namespace nav2_regulated_modules

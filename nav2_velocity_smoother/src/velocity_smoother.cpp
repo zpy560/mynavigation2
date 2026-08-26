@@ -86,10 +86,13 @@ nav2_util::CallbackReturn VelocitySmoother::on_configure(const rclcpp_lifecycle:
   declare_parameter_if_not_declared(node, "odom_duration", rclcpp::ParameterValue(0.1));
   declare_parameter_if_not_declared(node, "deadband_velocity", rclcpp::ParameterValue(std::vector<double>{0.0, 0.0, 0.0}));
   declare_parameter_if_not_declared(node, "velocity_timeout", rclcpp::ParameterValue(1.0));
+  declare_parameter_if_not_declared(node, "speed_limit_topic", rclcpp::ParameterValue("speed_limit"));
   node->get_parameter("odom_topic", odom_topic_);
   node->get_parameter("odom_duration", odom_duration_);
   node->get_parameter("deadband_velocity", deadband_velocities_);
   node->get_parameter("velocity_timeout", velocity_timeout_dbl);
+  std::string speed_limit_topic;
+  get_parameter("speed_limit_topic", speed_limit_topic);
   velocity_timeout_ = rclcpp::Duration::from_seconds(velocity_timeout_dbl);
   LOG_INFO("Velocity smoother feature parameters odom_topic={}, odom_duration={}, velocity_timeout={}", odom_topic_.c_str(), odom_duration_, velocity_timeout_dbl);
 
@@ -97,6 +100,8 @@ nav2_util::CallbackReturn VelocitySmoother::on_configure(const rclcpp_lifecycle:
   {
     throw std::runtime_error("Invalid setting of kinematic and/or deadband limits!" " All limits must be size of 3 representing (x, y, theta).");
   }
+  target_maxvx_ = max_velocities_[0];
+  target_minvx_ = min_velocities_[0];
 
   // Get control type
   if (feedback_type == "OPEN_LOOP") {
@@ -113,6 +118,7 @@ nav2_util::CallbackReturn VelocitySmoother::on_configure(const rclcpp_lifecycle:
   // Setup inputs / outputs
   smoothed_cmd_pub_ = create_publisher<geometry_msgs::msg::Twist>("cmd_vel_smoothed", 1);
   cmd_sub_ = create_subscription<geometry_msgs::msg::Twist>("cmd_vel", rclcpp::QoS(1), std::bind(&VelocitySmoother::inputCommandCallback, this, std::placeholders::_1));
+  speed_limit_sub_ = create_subscription<nav2_msgs::msg::SpeedLimit>(speed_limit_topic, rclcpp::QoS(10), std::bind(&VelocitySmoother::speedLimitCallback, this, std::placeholders::_1));
 
   return nav2_util::CallbackReturn::SUCCESS;
 }
@@ -244,6 +250,26 @@ void VelocitySmoother::smootherTimer() {
   } else {
     current_ = odom_smoother_->getTwist();
   }
+  if (limitv2target) {
+    // 当前速度不在 [target_minvx_, target_maxvx_] 区间内：以加速度/减速度步长逐步逼近目标限幅，避免超调
+    if (current_.linear.x < target_minvx_ || current_.linear.x > target_maxvx_) {
+      max_velocities_[0] = applyConstraints(max_velocities_[0], target_maxvx_, max_accels_[0], max_decels_[0], 1.0);
+      min_velocities_[0] = applyConstraints(min_velocities_[0], target_minvx_, max_accels_[0], max_decels_[0], 1.0);
+    } else {
+      // 当前速度已在目标区间内：直接到位
+      max_velocities_[0] = target_maxvx_;
+      min_velocities_[0] = target_minvx_;
+    }
+
+    // 限幅已移动到目标则结束过渡
+    if (std::fabs(max_velocities_[0] - target_maxvx_) < 1e-3 &&
+      std::fabs(min_velocities_[0] - target_minvx_) < 1e-3)
+    {
+      max_velocities_[0] = target_maxvx_;
+      min_velocities_[0] = target_minvx_;
+      limitv2target = false;
+    }
+  }
 
   // Apply absolute velocity restrictions to the command
   command_->linear.x = std::clamp(command_->linear.x, min_velocities_[0], max_velocities_[0]);
@@ -280,12 +306,34 @@ void VelocitySmoother::smootherTimer() {
   cmd_vel->angular.z = applyConstraints(current_.angular.z, command_->angular.z, max_accels_[2], max_decels_[2], eta);
   last_cmd_ = *cmd_vel;
 
+  cmd_vel->linear.x = std::clamp(cmd_vel->linear.x, min_velocities_[0], max_velocities_[0]);
+  cmd_vel->linear.y = std::clamp(cmd_vel->linear.y, min_velocities_[1], max_velocities_[1]);
+  cmd_vel->angular.z = std::clamp(cmd_vel->angular.z, min_velocities_[2], max_velocities_[2]);
   // Apply deadband restrictions & publish
   cmd_vel->linear.x = fabs(cmd_vel->linear.x) < deadband_velocities_[0] ? 0.0 : cmd_vel->linear.x;
   cmd_vel->linear.y = fabs(cmd_vel->linear.y) < deadband_velocities_[1] ? 0.0 : cmd_vel->linear.y;
   cmd_vel->angular.z = fabs(cmd_vel->angular.z) < deadband_velocities_[2] ? 0.0 : cmd_vel->angular.z;
+  // LOG_INFO("command: linear.x:{}, linear.y:{}, angular.z:{}| current:{}, {}, {} | cmd_vel:{}, {}, {}", 
+  //   command_->linear.x, command_->linear.y, command_->angular.z,
+  //   current_.linear.x,  current_.linear.y,  current_.angular.z,
+  //   cmd_vel->linear.x,  cmd_vel->linear.y,  cmd_vel->angular.z
+  // );
+  // LOG_INFO(" min_velocities_[0]={}, max_velocities_[0]={} ", min_velocities_[0], max_velocities_[0] );
 
   smoothed_cmd_pub_->publish(std::move(cmd_vel));
+}
+
+void VelocitySmoother::speedLimitCallback(const nav2_msgs::msg::SpeedLimit::SharedPtr msg) {
+  if (msg->percentage) {
+      RCLCPP_ERROR(this->get_logger(), "Percentage mode is not supported");
+      return;
+  }
+
+  double speed = msg->speed_limit;
+  RCLCPP_INFO(this->get_logger(), "set speed = {%0.3f}",speed);
+  target_maxvx_ = std::max(0.0, speed);   // 正数保留，负数归零
+  target_minvx_ = std::min(0.0, speed);   // 负数保留，正数归零
+  limitv2target = true;
 }
 
 rcl_interfaces::msg::SetParametersResult VelocitySmoother::dynamicParametersCallback(std::vector<rclcpp::Parameter> parameters) {
