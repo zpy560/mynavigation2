@@ -543,10 +543,10 @@ myagv_keyboard_control:
     angular_speed: 0.5
     linear_accel_limit: 2.0
     linear_accel_jerk_limit: 4.0
-    linear_decel_limit: 3.0
-    linear_decel_jerk_limit: 6.0
+    linear_decel_limit: 4.0
+    linear_decel_jerk_limit: 8.0
     angular_accel_limit: 1.0
     angular_accel_jerk_limit: 2.0
     angular_decel_limit: 1.5
     angular_decel_jerk_limit: 3.0
-    command_timeout: 0.25
+    command_timeout: 0.10

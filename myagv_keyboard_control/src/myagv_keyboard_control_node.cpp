@@ -361,11 +361,16 @@ private:
     const auto now = std::chrono::steady_clock::now();
     applyCommandTimeout(now);
     
-    const double elapsed = std::chrono::duration<double>(now - last_update_time_).count();
-    last_update_time_ = now;
-    const double dt = std::clamp(elapsed, 0.0, 2.0 / publish_rate_);
+    // RCLCPP_INFO(get_logger(), "线性速度规划.");
+    // const double elapsed = std::chrono::duration<double>(now - last_update_time_).count();
+    // last_update_time_ = now;
+    // const double dt = std::clamp(elapsed, 0.0, 2.0 / publish_rate_);
     // RCLCPP_INFO(get_logger(), "msg print time: dt=%.3f .", dt);
-    updateSmoothedCommand(dt);             
+    // updateSmoothedCommand(dt);             
+
+    // RCLCPP_INFO(get_logger(), "S型曲线速度规划.");            
+    current_v_ = linear_planner_->update();   
+    current_w_ = angular_planner_->update();  
 
     publishCommand();
   }
