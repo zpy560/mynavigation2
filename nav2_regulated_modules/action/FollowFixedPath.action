@@ -1,5 +1,0 @@
-nav_msgs/Path path
----
-bool success
----
-float64 distance_remaining

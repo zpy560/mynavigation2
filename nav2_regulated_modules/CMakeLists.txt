@@ -6,7 +6,6 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 find_package(ament_cmake REQUIRED)
-find_package(rosidl_default_generators REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_action REQUIRED)
 find_package(rclcpp_lifecycle REQUIRED)
@@ -21,14 +20,11 @@ find_package(tf2_geometry_msgs REQUIRED)
 find_package(spdlog_wrapper REQUIRED)
 find_package(visualization_msgs REQUIRED)
 
-rosidl_generate_interfaces(${PROJECT_NAME}
-  "action/FollowFixedPath.action"
-  DEPENDENCIES nav_msgs
-)
-
 add_executable(regulated_navigator_node
   src/regulated_navigator_node.cpp
   src/regulated_navigator.cpp
+  src/chassis_control_subscriber.cpp
+  src/motion_state_subscriber.cpp
   src/navigator_goal_handler.cpp
   src/navigator_planning.cpp
   src/navigator_fixed_path.cpp
@@ -71,7 +67,6 @@ install(DIRECTORY
 )
 
 install(DIRECTORY
-  action
   launch
   maps
   params

@@ -19,7 +19,9 @@
 #include "nav2_msgs/action/navigate_to_pose.hpp"
 #include "nav2_msgs/action/smooth_path.hpp"
 #include "nav2_msgs/srv/clear_entire_costmap.hpp"
+#include "nav2_regulated_modules/chassis_control_subscriber.hpp"
 #include "nav2_regulated_modules/control_module.hpp"
+#include "nav2_regulated_modules/motion_state_subscriber.hpp"
 #include "nav2_regulated_modules/navigation_state.hpp"
 #include "nav2_regulated_modules/planning_module.hpp"
 #include "nav2_util/lifecycle_node.hpp"
@@ -123,6 +125,8 @@ private:
   uint64_t follow_sequence_{0};
   NavigationTask task_;
   NavigationMode operation_mode_{NavigationMode::AUTONOMOUS};
+  std::unique_ptr<MotionStateSubscriber> motion_state_subscriber_;
+  std::unique_ptr<ChassisControlSubscriber> chassis_control_subscriber_;
   PlanningModule planning_module_;
   ControlModule control_module_;
 

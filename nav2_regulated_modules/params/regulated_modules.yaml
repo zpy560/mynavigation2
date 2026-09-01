@@ -133,6 +133,22 @@ regulated_navigator:
     progress_timeout: 10.0
     progress_min_translation: 0.1
     stop_cmd_vel_topic: "cmd_vel_nav"
+    chassis_output_topic: "/control_to_uart"
+    motion_state_timeout: 0.2
+    chassis_max_linear_velocity: 0.52
+    chassis_max_angular_velocity: 2.0
+    chassis_default_linear_acceleration: 0.5
+    chassis_default_angular_acceleration: 1.0
+    chassis_max_linear_acceleration: 2.5
+    chassis_max_angular_acceleration: 3.2
+    chassis_linear_stop_threshold: 0.01
+    chassis_angular_stop_threshold: 0.05
+    chassis_linear_kp: 0.2
+    chassis_linear_ki: 0.0
+    chassis_angular_kp: 0.2
+    chassis_angular_ki: 0.0
+    chassis_linear_integral_limit: 0.2
+    chassis_angular_integral_limit: 0.5
 
 controller_server:
   ros__parameters:

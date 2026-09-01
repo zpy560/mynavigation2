@@ -12,6 +12,7 @@
   <depend>byd_custom_msgs</depend>
   <depend>geometry_msgs</depend>
   <depend>rclcpp</depend>
+  <depend>spdlog_wrapper</depend>
 
   <export>
     <build_type>ament_cmake</build_type>

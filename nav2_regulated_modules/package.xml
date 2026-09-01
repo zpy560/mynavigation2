@@ -8,7 +8,6 @@
   <license>Apache-2.0</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
-  <buildtool_depend>rosidl_default_generators</buildtool_depend>
 
   <depend>geometry_msgs</depend>
   <depend>nav2_msgs</depend>
@@ -23,8 +22,6 @@
   <depend>tf2_geometry_msgs</depend>
   <depend>spdlog_wrapper</depend>
   <depend>visualization_msgs</depend>
-  <exec_depend>rosidl_default_runtime</exec_depend>
-
   <exec_depend>launch</exec_depend>
   <exec_depend>launch_ros</exec_depend>
   <exec_depend>nav2_common</exec_depend>
@@ -48,8 +45,6 @@
   <exec_depend>dwb_plugins</exec_depend>
   <exec_depend>controlpub</exec_depend>
   <exec_depend>myagv_keyboard_control</exec_depend>
-
-  <member_of_group>rosidl_interface_packages</member_of_group>
 
   <export>
     <build_type>ament_cmake</build_type>

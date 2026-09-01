@@ -4,6 +4,7 @@
 #include <cmath>
 #include <functional>
 #include <memory>
+#include <stdexcept>
 
 using namespace std::chrono_literals;
 
@@ -54,6 +55,22 @@ RegulatedNavigator::RegulatedNavigator(const rclcpp::NodeOptions & options) : na
   declare_parameter("velocity_odom_topic", "/odometry");
   declare_parameter("velocity_log_frequency", 1.0);
   declare_parameter<std::string>("speed_limit_topic", "speed_limit");
+  declare_parameter<std::string>("chassis_output_topic", "/control_to_uart");
+  declare_parameter("motion_state_timeout", 0.2);
+  declare_parameter("chassis_max_linear_velocity", 0.52);
+  declare_parameter("chassis_max_angular_velocity", 2.0);
+  declare_parameter("chassis_default_linear_acceleration", 0.5);
+  declare_parameter("chassis_default_angular_acceleration", 1.0);
+  declare_parameter("chassis_max_linear_acceleration", 2.5);
+  declare_parameter("chassis_max_angular_acceleration", 3.2);
+  declare_parameter("chassis_linear_stop_threshold", 0.01);
+  declare_parameter("chassis_angular_stop_threshold", 0.05);
+  declare_parameter("chassis_linear_kp", 0.2);
+  declare_parameter("chassis_linear_ki", 0.0);
+  declare_parameter("chassis_angular_kp", 0.2);
+  declare_parameter("chassis_angular_ki", 0.0);
+  declare_parameter("chassis_linear_integral_limit", 0.2);
+  declare_parameter("chassis_angular_integral_limit", 0.5);
 }
 
 nav2_util::CallbackReturn RegulatedNavigator::on_configure(const rclcpp_lifecycle::State &) {
@@ -110,6 +127,31 @@ nav2_util::CallbackReturn RegulatedNavigator::on_configure(const rclcpp_lifecycl
 
   planning_module_.configure(get_parameter("planner_id").as_string(), get_parameter("smoother_id").as_string(), get_parameter("use_smoother").as_bool(), get_parameter("replan_frequency").as_double(), get_parameter("max_consecutive_planning_failures").as_int());
   control_module_.configure(get_parameter("controller_id").as_string(), get_parameter("goal_checker_id").as_string(), get_parameter("progress_timeout").as_double());
+  motion_state_subscriber_ = std::make_unique<MotionStateSubscriber>(*this);
+  ChassisControlConfig chassis_control_config;
+  chassis_control_config.output_topic = get_parameter("chassis_output_topic").as_string();
+  chassis_control_config.motion_state_timeout = get_parameter("motion_state_timeout").as_double();
+  chassis_control_config.max_linear_velocity = get_parameter("chassis_max_linear_velocity").as_double();
+  chassis_control_config.max_angular_velocity = get_parameter("chassis_max_angular_velocity").as_double();
+  chassis_control_config.default_linear_acceleration = get_parameter("chassis_default_linear_acceleration").as_double();
+  chassis_control_config.default_angular_acceleration = get_parameter("chassis_default_angular_acceleration").as_double();
+  chassis_control_config.max_linear_acceleration = get_parameter("chassis_max_linear_acceleration").as_double();
+  chassis_control_config.max_angular_acceleration = get_parameter("chassis_max_angular_acceleration").as_double();
+  chassis_control_config.linear_stop_threshold = get_parameter("chassis_linear_stop_threshold").as_double();
+  chassis_control_config.angular_stop_threshold = get_parameter("chassis_angular_stop_threshold").as_double();
+  chassis_control_config.linear_kp = get_parameter("chassis_linear_kp").as_double();
+  chassis_control_config.linear_ki = get_parameter("chassis_linear_ki").as_double();
+  chassis_control_config.angular_kp = get_parameter("chassis_angular_kp").as_double();
+  chassis_control_config.angular_ki = get_parameter("chassis_angular_ki").as_double();
+  chassis_control_config.linear_integral_limit = get_parameter("chassis_linear_integral_limit").as_double();
+  chassis_control_config.angular_integral_limit = get_parameter("chassis_angular_integral_limit").as_double();
+  try {
+    chassis_control_subscriber_ = std::make_unique<ChassisControlSubscriber>(*this, *motion_state_subscriber_, chassis_control_config);
+  } catch (const std::invalid_argument & error) {
+    LOG_ERROR("ChassisControl 闭环配置失败：{}", error.what());
+    motion_state_subscriber_.reset();
+    return nav2_util::CallbackReturn::FAILURE;
+  }
 
   compute_pose_client_ = rclcpp_action::create_client<ComputePathToPose>(this, get_parameter("compute_path_to_pose_action").as_string());
   compute_poses_client_ = rclcpp_action::create_client<ComputePathThroughPoses>(this, get_parameter("compute_path_through_poses_action").as_string());
@@ -150,6 +192,7 @@ nav2_util::CallbackReturn RegulatedNavigator::on_configure(const rclcpp_lifecycl
 nav2_util::CallbackReturn RegulatedNavigator::on_activate(const rclcpp_lifecycle::State &) {
   if (fixed_path_pub_) {fixed_path_pub_->on_activate();}
   if (fixed_path_boundaries_pub_) {fixed_path_boundaries_pub_->on_activate();}
+  if (chassis_control_subscriber_) {chassis_control_subscriber_->activate();}
   active_ = true;
   createBond();
   LOG_INFO("独立规控导航器已激活");
@@ -158,6 +201,7 @@ nav2_util::CallbackReturn RegulatedNavigator::on_activate(const rclcpp_lifecycle
 
 nav2_util::CallbackReturn RegulatedNavigator::on_deactivate(const rclcpp_lifecycle::State &) {
   active_ = false;
+  if (chassis_control_subscriber_) {chassis_control_subscriber_->deactivate();}
   cancelTask("节点停用");
   if (fixed_path_pub_) {fixed_path_pub_->on_deactivate();}
   if (fixed_path_boundaries_pub_) {fixed_path_boundaries_pub_->on_deactivate();}
@@ -177,6 +221,9 @@ nav2_util::CallbackReturn RegulatedNavigator::on_cleanup(const rclcpp_lifecycle:
   follow_client_.reset();
   clear_local_client_.reset();
   clear_global_client_.reset();
+  if (chassis_control_subscriber_) {chassis_control_subscriber_->reset();}
+  chassis_control_subscriber_.reset();
+  motion_state_subscriber_.reset();
   goal_sub_.reset();
   controller_velocity_sub_.reset();
   smoothed_velocity_sub_.reset();
@@ -201,6 +248,7 @@ nav2_util::CallbackReturn RegulatedNavigator::on_cleanup(const rclcpp_lifecycle:
 }
 
 nav2_util::CallbackReturn RegulatedNavigator::on_shutdown(const rclcpp_lifecycle::State &) {
+  if (chassis_control_subscriber_) {chassis_control_subscriber_->deactivate();}
   cancelTask("节点关闭");
   LOG_INFO("独立规控导航器已关闭");
   return nav2_util::CallbackReturn::SUCCESS;
