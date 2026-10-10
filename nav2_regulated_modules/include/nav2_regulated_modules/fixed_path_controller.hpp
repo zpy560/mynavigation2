@@ -112,6 +112,8 @@ private:
   double start_position_tolerance_ { 1.20 };
   double direct_tracking_lateral_tolerance_ { 0.20 };
   double start_offset_speed_limit_ = 0.30;
+  double start_speed_limit_distance_ = 0.50;
+  bool start_speed_prebraking_ = false;
   double start_speed_release_yaw_tolerance_ = 0.3490658503988659;
   int start_speed_release_stable_cycles_ = 10;
   double direct_tracking_max_yaw_error_ { 0.2617993877991494 };

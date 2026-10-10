@@ -45,6 +45,7 @@ void FixedPathController::configure(const rclcpp_lifecycle::LifecycleNode::WeakP
   nav2_util::declare_parameter_if_not_declared(node, plugin_name_ + ".start_position_tolerance", rclcpp::ParameterValue(1.20));
   nav2_util::declare_parameter_if_not_declared(node, plugin_name_ + ".direct_tracking_lateral_tolerance", rclcpp::ParameterValue(0.20));
   nav2_util::declare_parameter_if_not_declared(node, plugin_name_ + ".start_offset_speed_limit", rclcpp::ParameterValue(0.30));
+  nav2_util::declare_parameter_if_not_declared(node, plugin_name_ + ".start_speed_limit_distance", rclcpp::ParameterValue(0.50));
   nav2_util::declare_parameter_if_not_declared(node, plugin_name_ + ".start_speed_release_yaw_tolerance", rclcpp::ParameterValue(0.3490658503988659));
   nav2_util::declare_parameter_if_not_declared(node, plugin_name_ + ".start_speed_release_stable_cycles", rclcpp::ParameterValue(10));
   nav2_util::declare_parameter_if_not_declared(node, plugin_name_ + ".direct_tracking_max_yaw_error", rclcpp::ParameterValue(0.2617993877991494));
@@ -85,6 +86,7 @@ void FixedPathController::configure(const rclcpp_lifecycle::LifecycleNode::WeakP
   node->get_parameter(plugin_name_ + ".start_position_tolerance", start_position_tolerance_);
   node->get_parameter(plugin_name_ + ".direct_tracking_lateral_tolerance", direct_tracking_lateral_tolerance_);
   node->get_parameter(plugin_name_ + ".start_offset_speed_limit", start_offset_speed_limit_);
+  node->get_parameter(plugin_name_ + ".start_speed_limit_distance", start_speed_limit_distance_);
   node->get_parameter(plugin_name_ + ".start_speed_release_yaw_tolerance", start_speed_release_yaw_tolerance_);
   node->get_parameter(plugin_name_ + ".start_speed_release_stable_cycles", start_speed_release_stable_cycles_);
   node->get_parameter(plugin_name_ + ".direct_tracking_max_yaw_error", direct_tracking_max_yaw_error_);
@@ -122,7 +124,7 @@ void FixedPathController::configure(const rclcpp_lifecycle::LifecycleNode::WeakP
   {
     throw nav2_core::PlannerException("FixedPathController parameters are invalid");
   }
-  if (!std::isfinite(direct_tracking_lateral_tolerance_) || !std::isfinite(start_offset_speed_limit_) || start_offset_speed_limit_ <= 0.0 || !std::isfinite(start_speed_release_yaw_tolerance_) || start_speed_release_yaw_tolerance_ <= 0.0 || start_speed_release_yaw_tolerance_ >= M_PI || start_speed_release_stable_cycles_ < 1)
+  if (!std::isfinite(direct_tracking_lateral_tolerance_) || !std::isfinite(start_offset_speed_limit_) || start_offset_speed_limit_ <= 0.0 || !std::isfinite(start_speed_limit_distance_) || start_speed_limit_distance_ <= 0.0 || !std::isfinite(start_speed_release_yaw_tolerance_) || start_speed_release_yaw_tolerance_ <= 0.0 || start_speed_release_yaw_tolerance_ >= M_PI || start_speed_release_stable_cycles_ < 1)
   {
     throw nav2_core::PlannerException("FixedPathController start speed guard parameters are invalid");
   }
@@ -143,7 +145,7 @@ void FixedPathController::configure(const rclcpp_lifecycle::LifecycleNode::WeakP
     throw nav2_core::PlannerException("FixedPathController adaptive braking parameters are invalid");
   }
   LOG_INFO("固定路径控制器配置完成，plugin={}，最大线速度={:.3f}m/s，终点减速度={:.3f}m/s^2，终点微量接近速度={:.3f}m/s，制动反应时间={:.3f}s，制动距离裕量={:.3f}m，终点基础前视={:.3f}m，前视参考速度={:.3f}m/s，前视速度增益={:.3f}s，前视范围=[{:.3f},{:.3f}]m，起点位置容差={:.3f}m，直接跟踪横向容差={:.3f}m，直接跟踪航向门限={:.3f}rad，严格对齐航向容差={:.3f}rad，终点按位置或越界锁存停车", plugin_name_, base_linear_velocity_, goal_linear_deceleration_, goal_final_approach_velocity_, goal_braking_reaction_time_, goal_braking_distance_margin_, goal_terminal_lookahead_dist_, goal_terminal_lookahead_reference_speed_, goal_terminal_lookahead_speed_gain_, goal_terminal_lookahead_min_dist_, goal_terminal_lookahead_max_dist_, start_position_tolerance_, direct_tracking_lateral_tolerance_, direct_tracking_max_yaw_error_, initial_yaw_tolerance_);
-  LOG_INFO("固定路径起步限速配置：触发横向偏差>{:.3f}m，限速={:.3f}m/s，解除航向误差≤{:.3f}rad，连续周期={}", direct_tracking_lateral_tolerance_, start_offset_speed_limit_, start_speed_release_yaw_tolerance_, start_speed_release_stable_cycles_);
+  LOG_INFO("固定路径起步限速配置：每条路径保护距离={:.3f}m，限速={:.3f}m/s，解除横向误差≤{:.3f}m，航向误差≤{:.3f}rad，连续周期={}", start_speed_limit_distance_, start_offset_speed_limit_, direct_tracking_lateral_tolerance_, start_speed_release_yaw_tolerance_, start_speed_release_stable_cycles_);
 }
 
 // 释放插件资源并复位控制器内部阶段与路径状态。
@@ -154,6 +156,7 @@ void FixedPathController::cleanup()
   start_path_points_.clear();
   start_speed_guard_.reset();
   nearest_index_ = 0;
+  start_speed_prebraking_ = false;
   goal_tangent_index_ = 0;
   stable_cycles_ = 0;
   start_strategy_evaluated_ = false;
@@ -239,6 +242,7 @@ void FixedPathController::setPlan(const nav_msgs::msg::Path & path)
   }
   start_speed_guard_.reset();
   nearest_index_ = 0;
+  start_speed_prebraking_ = true;
   goal_tangent_index_ = goal_tangent_index;
   // 车头与起点切线同向记为前进，反向记为倒车；后续速度输出使用此符号。
   direction_sign_ = direction_cosine > 0.0 ? 1 : -1;
@@ -303,6 +307,16 @@ geometry_msgs::msg::TwistStamped FixedPathController::computeVelocityCommands(co
     return zeroCommand();
   }
   const double start_distance = poseDistance(robot_pose, global_plan_.poses.front());
+  // 移动中接收新路径时先平滑减速，不把减速和原地转向计入保护距离。
+  if (start_speed_prebraking_)
+  {
+    if (detail::requiresStartPrebraking(velocity.linear.x, std::min(start_offset_speed_limit_, speed_limit_)))
+    {
+      LOG_DEBUG("固定路径起步预减速：实测速度={:.6f}，起步上限={:.6f}", velocity.linear.x, std::min(start_offset_speed_limit_, speed_limit_));
+      return zeroCommand();
+    }
+    start_speed_prebraking_ = false;
+  }
   // 起点阶段先决定是否需要原地转向；进入 TRACK_PATH 后不再重新选择策略。
   if (phase_ == Phase::ALIGN_START)
   {
@@ -322,9 +336,9 @@ geometry_msgs::msg::TwistStamped FixedPathController::computeVelocityCommands(co
     {
       direct_start_tracking_ = lateral_error <= direct_tracking_lateral_tolerance_;
       start_strategy_evaluated_ = true;
-      if (start_speed_guard_.evaluateStart(lateral_error, direct_tracking_lateral_tolerance_))
+      if (start_speed_guard_.evaluateStart())
       {
-        LOG_INFO("固定路径起点横向偏差={:.3f}m，起步纵向速度指令上限锁定为{:.3f}m/s", lateral_error, start_offset_speed_limit_);
+        LOG_INFO("固定路径起步限速已进入：横向偏差={:.3f}m，航向误差={:.3f}rad，纵向上限={:.3f}m/s，保护距离={:.3f}m", lateral_error, yaw_error, start_offset_speed_limit_, start_speed_limit_distance_);
       }
       LOG_INFO("固定路径起点策略已锁定，方向={}，起点距离={:.3f}m，横向误差={:.3f}m，运动方向航向误差={:.3f}rad，策略={}", direction_sign_ > 0 ? "forward" : "backward", start_distance, lateral_error, yaw_error, direct_start_tracking_ ? "direct_tracking" : "strict_alignment");
     }
@@ -380,11 +394,13 @@ geometry_msgs::msg::TwistStamped FixedPathController::computeVelocityCommands(co
   {
     double local_lateral_error = 0.0;
     double local_heading_error = 0.0;
-    if (detail::calculateStartRecoveryErrors(start_path_points_, nearest_index_, robot_pose.pose.position.x, robot_pose.pose.position.y, poseYaw(robot_pose), direction_sign_, local_lateral_error, local_heading_error))
+    double start_progress = 0.0;
+    if (detail::calculateStartRecoveryErrors(start_path_points_, nearest_index_, robot_pose.pose.position.x, robot_pose.pose.position.y, poseYaw(robot_pose), direction_sign_, local_lateral_error, local_heading_error, &start_progress))
     {
-      if (start_speed_guard_.observe(local_lateral_error, local_heading_error, direct_tracking_lateral_tolerance_, start_speed_release_yaw_tolerance_, start_speed_release_stable_cycles_))
+      LOG_DEBUG("固定路径起步保护：路径进度={:.6f}m，保护距离={:.6f}m，横向误差={:.6f}m，航向误差={:.6f}rad", start_progress, start_speed_limit_distance_, local_lateral_error, local_heading_error);
+      if (start_speed_guard_.observe(local_lateral_error, local_heading_error, direct_tracking_lateral_tolerance_, start_speed_release_yaw_tolerance_, start_speed_release_stable_cycles_, start_progress, start_speed_limit_distance_))
       {
-        LOG_INFO("固定路径起步限速已解除，横向误差={:.3f}m，运动方向航向误差={:.3f}rad，连续达标周期={}", local_lateral_error, local_heading_error, start_speed_release_stable_cycles_);
+        LOG_INFO("固定路径起步限速已解除，路径进度={:.3f}m，横向误差={:.3f}m，运动方向航向误差={:.3f}rad，连续达标周期={}", start_progress, local_lateral_error, local_heading_error, start_speed_release_stable_cycles_);
       }
     }
     else
@@ -393,6 +409,7 @@ geometry_msgs::msg::TwistStamped FixedPathController::computeVelocityCommands(co
     }
   }
   const double effective_linear_limit = std::min(std::min(base_linear_velocity_, speed_limit_), start_speed_guard_.active() ? start_offset_speed_limit_ : base_linear_velocity_);
+  LOG_DEBUG("固定路径起步速度链：保护={}，任务限速={:.6f}，有效上限={:.6f}", start_speed_guard_.active(), speed_limit_, effective_linear_limit);
   const auto & goal_position = global_plan_.poses.back().pose.position;
   const double goal_delta_x = robot_pose.pose.position.x - goal_position.x;
   const double goal_delta_y = robot_pose.pose.position.y - goal_position.y;

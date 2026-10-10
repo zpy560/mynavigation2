@@ -529,8 +529,10 @@ controller_server:
       start_position_tolerance: 1.20
       # 允许直接跟踪的起点横向误差，单位米。
       direct_tracking_lateral_tolerance: 0.20
-      # 首次起点横向偏差超过上述阈值时的纵向速度指令上限，单位米每秒。
+      # 所有新固定路径的起步纵向速度指令上限，单位米每秒；仍受更低任务限速约束。
       start_offset_speed_limit: 0.30
+      # 每个任务从开始平移跟踪的位置沿路径至少低速行驶0.5米。
+      start_speed_limit_distance: 0.50
       # 当前最近路径段的运动方向航向误差需不超过 20 度，才能解除起步限速。
       start_speed_release_yaw_tolerance: 0.3490658503988659
       # 横向及航向误差连续达标的控制周期数；解除后本条路径不再重新限速。
@@ -908,9 +910,9 @@ velocity_smoother:
     # 速度各轴下限数组，依次为 x、y、角速度。
     min_velocity: [-1.5, 0.0, -2.0]
     # 速度各轴加速度上限数组。
-    max_accel: [2.5, 0.0, 3.2]
+    max_accel: [2.0, 0.0, 3.2]
     # 速度各轴减速度下限数组。
-    max_decel: [-2.5, 0.0, -3.2]
+    max_decel: [-2.0, 0.0, -3.2]
     # 控制器读取里程计的话题。
     odom_topic: "/motion_state"
     # 计算速度反馈的里程计时间窗口，单位秒。
