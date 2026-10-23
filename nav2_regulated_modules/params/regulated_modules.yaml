@@ -588,15 +588,15 @@ controller_server:
       # 自适应停车距离的固定裕量，单位米。
       adaptive_goal_distance_margin: 0.01
       # 终点前视的基准距离，单位米。
-      goal_terminal_lookahead_dist: 0.20
+      goal_terminal_lookahead_dist: 0.30
       # 终点前视基准速度，单位米每秒。
-      goal_terminal_lookahead_reference_speed: 0.75
+      goal_terminal_lookahead_reference_speed: 0.3
       # 终点前视随速度变化的增益。
-      goal_terminal_lookahead_speed_gain: 0.1
+      goal_terminal_lookahead_speed_gain: 0.2
       # 终点前视距离下界，单位米。
-      goal_terminal_lookahead_min_dist: 0.15
+      goal_terminal_lookahead_min_dist: 0.2
       # 终点前视距离上界，单位米。
-      goal_terminal_lookahead_max_dist: 0.25
+      goal_terminal_lookahead_max_dist: 0.4
       # 终点误差诊断输出频率，单位 Hz。
       goal_error_log_frequency: 1.0
       # 起点航向连续达标的周期数；1 表示进入 3 度容差的同一控制周期开始跟踪。
@@ -1193,9 +1193,9 @@ myagv_keyboard_control:
     # 遥控线加加速度上限，单位米每三次方秒。
     linear_accel_jerk_limit: 4.0
     # 遥控线减速度上限，单位米每二次方秒。
-    linear_decel_limit: 4.0
+    linear_decel_limit: 2.0
     # 遥控线减速加加速度上限，单位米每三次方秒。
-    linear_decel_jerk_limit: 8.0
+    linear_decel_jerk_limit: 4.0
     # 遥控角加速度上限，单位弧度每二次方秒。
     angular_accel_limit: 1.0
     # 遥控角加加速度上限，单位弧度每三次方秒。
