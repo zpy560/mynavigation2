@@ -183,6 +183,74 @@ FollowPath → Controller Server → /cmd_vel_nav → Velocity Smoother
 
 反馈类型要与消费者匹配：控制器、平滑器、导航器和统一诊断按话题末级名称是否为 `motion_state` 选择 MotionState／Odometry；MotionState 速度取 `v_car/w_car` 并保留源 Header。实际控制反馈以 `controller_server.odom_topic` 为准，平滑反馈以 `velocity_smoother.odom_topic` 为准，导航器看 `velocity_odom_topic`。当前两套 YAML 已显式配置为 `/motion_state`；自定义文件省略导航器字段时，其 C++ 回退仍为 `/odometry`，不能把不同层默认值混为一谈。
 
+## 底盘 ChassisControl 命令行发布
+
+话题为 `/downstream/chassis_control`，类型为 [`byd_custom_msgs/msg/ChassisControl`](byd_custom_msgs/msg/ChassisControl.msg)。在新终端加载同一工作空间，并与接收端使用相同的 ROS_DOMAIN_ID／DDS 设置：
+
+```bash
+source /opt/ros/humble/setup.bash
+cd /mnt/nvme/codex/nav2_demo/nav2_ws
+source install/local_setup.bash
+ros2 topic info /downstream/chassis_control --verbose
+```
+
+先确认实际消费者：场景仿真的 remote 模式由遥控网关接收；三个导航模式的 `regulated_navigator` 另有该订阅支路，需要节点 active 和新鲜 `/motion_state`。直接规控入口的 remote 是键盘直控，不自动接收此话题。发布 ChassisControl 不会自动取消导航任务或切换模式，遥控运动前先结束当前导航，并确认底盘输出没有发布者竞争。
+
+| `op` | 操作 | 使用的速度字段 |
+|---|---|---|
+| `0`（OP_FORWARD） | 前进 | `linear_velocity`，单位 m/s |
+| `1`（OP_BACKWARD） | 后退 | `linear_velocity`，单位 m/s |
+| `2`（OP_TURN_LEFT） | 原地左转 | `angular_velocity`，单位 rad/s |
+| `3`（OP_TURN_RIGHT） | 原地右转 | `angular_velocity`，单位 rad/s |
+
+速度和 `acceleration` 均填写有限、非负幅值，正负方向由 `op` 决定；前进／后退会将角速度置零，左转／右转会将线速度置零。`acceleration` 是对应线／角轴的加速度请求，填 0 使用接收端默认值，实际输出还受限速及 S 曲线约束。下面每次只运行一条运动命令，换方向前先 `Ctrl+C` 停止原发布进程。
+
+```bash
+# 前进：0.1 m/s，50 Hz 持续发送。
+ros2 topic pub --rate 50 --qos-reliability reliable --qos-durability volatile \
+  /downstream/chassis_control byd_custom_msgs/msg/ChassisControl \
+  '{header: {frame_id: base_link}, op: 0, linear_velocity: 0.1, angular_velocity: 0.0, acceleration: 0.3}'
+```
+
+```bash
+# 后退：幅值仍为正数，op=1 决定倒车。
+ros2 topic pub --rate 50 --qos-reliability reliable --qos-durability volatile \
+  /downstream/chassis_control byd_custom_msgs/msg/ChassisControl \
+  '{header: {frame_id: base_link}, op: 1, linear_velocity: 0.1, angular_velocity: 0.0, acceleration: 0.3}'
+```
+
+```bash
+# 原地左转：0.2 rad/s。
+ros2 topic pub --rate 50 --qos-reliability reliable --qos-durability volatile \
+  /downstream/chassis_control byd_custom_msgs/msg/ChassisControl \
+  '{header: {frame_id: base_link}, op: 2, linear_velocity: 0.0, angular_velocity: 0.2, acceleration: 0.3}'
+```
+
+```bash
+# 原地右转：幅值仍为正数，op=3 决定右转。
+ros2 topic pub --rate 50 --qos-reliability reliable --qos-durability volatile \
+  /downstream/chassis_control byd_custom_msgs/msg/ChassisControl \
+  '{header: {frame_id: base_link}, op: 3, linear_velocity: 0.0, angular_velocity: 0.2, acceleration: 0.3}'
+```
+
+停止原运动发布进程后，用下面命令以 50 Hz 连续发送 20 帧零目标，然后观察 `/motion_state` 的 `v_car/w_car` 确认停稳；没有单独的 STOP 操作码：
+
+```bash
+ros2 topic pub --rate 50 --times 20 --qos-reliability reliable --qos-durability volatile \
+  /downstream/chassis_control byd_custom_msgs/msg/ChassisControl \
+  '{header: {frame_id: base_link}, op: 0, linear_velocity: 0.0, angular_velocity: 0.0, acceleration: 0.3}'
+```
+
+只需发送一帧零速消息以检查消息接收或触发速度诊断时，可用：
+
+```bash
+ros2 topic pub --once --qos-reliability reliable --qos-durability volatile \
+  /downstream/chassis_control byd_custom_msgs/msg/ChassisControl \
+  '{header: {frame_id: base_link}, op: 0, linear_velocity: 0.0, angular_velocity: 0.0, acceleration: 0.0}'
+```
+
+`ros2 topic pub` 默认只有 1 Hz，而导航器底盘支路默认 `chassis_command_timeout=0.15` s、仿真遥控网关默认 `command_timeout=0.5` s，持续运动应显式使用上面的 50 Hz。超时会触发接收端停车处理；`Ctrl+C` 只结束发布进程，不会自动补发零速。示例 Header 仅设置 `frame_id`，时间戳使用消息默认零值；当前两个消费者按本地接收时间计算命令超时。速度诊断收到首帧 ChassisControl 后开始记录，也不代表底盘已经执行或停稳。
+
 ## 自主路径 Action 命令行测试
 
 后台已启动 Cartographer 定位和规控时，在新终端加载同一工作空间即可，不要重复启动导航栈。单点命令适用于仿真／实车的 autonomous 与 autonomous_fixed，多点仅适用于 autonomous；两个自主模式均拒绝非空行为树，fixed_path 和 remote 不接受这些自主目标。若启用了命名空间，给 Action、节点和服务名加上对应前缀。

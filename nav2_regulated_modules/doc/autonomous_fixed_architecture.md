@@ -40,21 +40,22 @@ Smac 内部平滑属于这一次请求；关闭额外 `SmoothPath`。输出通�
 - 捕获范围为当前验收半径外再加 0.02 m：换向点合计 0.03 m、默认最终控制尾点合计 0.027 m。此范围不扩大成功容差；微调还需满足更窄的原路径走廊、原方向、段尾平面、实测预算与碰撞检查。超限直接失败，不生成连接路径。
 - 最终位置相对原始请求目标≤0.01 m，控制包装对规划尾点≤0.007 m；请求航向容差约 9°，控制包装对规划尾点采用约 4.5°，协调器对原始目标再次检查。换向点保持 0.01 m／约 5°。
 - 包装检查局部 Costmap 的前进、倒车、旋转及制动足迹。阻挡时输出零速度，连续可通行 0.5 s 后恢复；连续阻挡超过 60 s 失败。Collision Monitor 默认关闭，速度平滑器直接输出 `cmd_vel`；已有外部碰撞状态门控仍默认启用，由独立参数 `enable_collision_state` 控制。
-- 定位源时间戳过期或速度反馈不新鲜时立即输出零速。短时中断在 0.5 s 窗口内保留同一个 FollowPath、原段游标和跟踪状态；至少两个不同源时间戳的定位帧且连续有效 0.15 s、反馈新鲜、位姿连续、距原段不超过 0.20 m，才允许继续。位姿连续性使用源时间间隔与速度上限构造运动上界，额外位置／航向余量为 0.05 m／0.1 rad；明显反向运动也转入完整恢复。重新输出前仍执行足迹与制动预测检查。
-- 超过短时窗口、位姿不连续或执行状态失联时，取消旧控制并进入完整恢复。该分支保留原有 10 s 恢复等待上限、定位连续稳定 0.5 s、车辆停稳和旧执行结束要求；仅重新下发原冻结段，不重新规划。
+- 行走期间由控制包装统一判断定位是否可用，导航器不再发布重复 TF 门控或三帧零速。首次取得可用定位、旋转段、终点制动锁存和距当前段终点 0.5 m 内，仍使用 `localization_timeout=0.3` s；沿途允许 TF 年龄至 `tracking_localization_timeout=0.6` s。终点严格区域还不小于任务速度上限乘沿途容忍时间再加 0.02 m 捕获余量。使用真实源时间戳和已有位姿，不重写 TF、不外推位置；单调计时异常、恢复时源时间戳倒退、超过 0.05 s 的未来 TF、查询不可用及速度反馈失效仍输出零速。
+- 暂停期间保留同一个 FollowPath、原段游标和跟踪状态；至少两个不同源时间戳的可用定位帧且连续有效 0.15 s、反馈新鲜、位姿连续、距原段不超过 0.20 m，才允许继续。位姿连续性使用源时间间隔与速度上限构造运动上界，额外位置／航向余量为 0.05 m／0.1 rad；明显反向运动也转入完整恢复。重新输出前仍执行足迹与制动预测检查。
+- `short_pause_timeout=0.5` s 只计算连续失效时间，收到可用数据即清除此计时，恢复稳定等待不消费该窗口。导航器以控制包装的暂停状态为准，不因自身 TF 刚过 0.3 s 或总暂停超过 0.5 s 取消 Action；一次保留 Action 的暂停仍受 10 s 恢复上限与 2 s 状态心跳上限约束。持续失效超过短时窗口或位姿不连续时，包装报告 WAIT_LOCALIZATION，才取消旧控制并进入完整恢复；该分支保留定位连续稳定 0.5 s、车辆停稳和旧执行结束要求，仅重新下发原冻结段，不重新规划。
 - 短时恢复按实测速度初始化衔接，线速度幅值增加限制为 0.5 m/s²、角速度幅值增加限制为 0.8 rad/s²；降低限速、零速保护立即生效。暂停重置连续制动／到点验收计时，位置复核窗口、微调次数、位移和截止时间不重置。微调过程中若反馈缺失导致运动预算不可核算，仍按原规则失败。
 - 恢复只截取原路径采样点，不加入当前位置或连接曲线，不跳过换向点。新目标抢占旧任务后，也要等待旧控制终态与停稳。
 - 不可恢复控制错误、超出捕获范围、位置复核超时、状态反馈超时或无进展会失败，不清空真实障碍，也不生成新路径。
 
 内部状态话题 `autonomous_fixed/execution_status` 使用 `std_msgs/String`，保留 `execution_id`、`point_index`、`phase`，新增 `reason`、`tf_stamp_ns`、`tf_age`、`odom_age`、`receive_age`、`pause_duration`。导航器同时接受原三字段格式和完整扩展格式。`execution_id` 对应当前下发子路径的唯一 Header 时间戳，`point_index` 为该子路径内的单调进度；协调器关联其分段表得到全局段号。阶段新增 PAUSED_LOCALIZATION，表示保留 Action 的零速短时暂停；WAIT_LOCALIZATION 表示必须取消后完整恢复。其余阶段保持。迟到执行编号的状态不能改变当前任务。
 
-导航器另以 `autonomous_fixed/localization_gate` 的 `std_msgs/String` 发布 `{"execution_id":编号,"paused":true或false}`，将自身 TF 判断传给同一执行的控制包装，控制包装持续执行零速门控；旧执行请求忽略。该话题不是 Collision Monitor，也不生成外部 `/collision_state`。TF 过期、查询不可用、未来时间戳、里程计源时间戳过期、接收超时及无效速度分别记录原因，导航器与控制包装通过 Launch 使用同一定位超时参数。
+`autonomous_fixed/localization_gate` 的内部发布／订阅已移除。行走中的 TF 判断只由控制包装执行；导航器仍在启动、完整恢复和分段验收时独立检查新鲜定位。TF 在严格门限与沿途门限之间且允许继续行走时，状态为 TRACKING、原因为 TF_DELAY_TOLERATED；实际过期、查询不可用、未来时间戳、里程计源时间戳过期、接收超时及无效速度仍分别记录原因。缺少可用导航器位姿时暂缓其几何进度更新，控制包装与状态心跳、恢复上限仍有效。
 
 轨迹拒绝日志最多每秒一条，区分 Costmap 未更新、当前／反应阶段／运动预测／制动预测足迹、微调走廊，并记录首个拒绝预测位姿、预测时长、足迹代价、中心栅格索引和代价、实测／目标速度。中心栅格不等于造成足迹边界碰撞的具体障碍点；仍需结合地图和雷达核对。检查判据与障碍等待上限保持。
 
 新控制包装参数为 `brake_stable_duration=0.2`、`settle_duration=0.5`、`terminal_review_timeout=2.0`、`terminal_capture_margin=0.02`。这些配置仅属于第四模式；当前运行中的旧插件需要在用户重启导航后加载新实现。
 
-连续性参数为导航器 `autonomous_fixed_short_pause_timeout=0.5`、`autonomous_fixed_resume_stable_duration=0.15`，Launch 同步至包装的 `short_pause_timeout`／`resume_stable_duration`，稳定时间必须小于暂停窗口。包装的 `localization_timeout`、`resume_distance` 同步导航器既有参数，`resume_linear_acceleration=0.5`。此前连续性调整将第四模式 `tracker.goal_final_approach_velocity` 提至 0.02 m/s；本轮 10 mm 精度调整改为 0.01 m/s，0.5 m/s 常规上限与制动参数保持。
+连续性参数为导航器 `autonomous_fixed_short_pause_timeout=0.5`、`autonomous_fixed_resume_stable_duration=0.15`，Launch 同步至包装的 `short_pause_timeout`／`resume_stable_duration`，稳定时间必须小于连续失效窗口。新增 `autonomous_fixed_tracking_localization_timeout=0.6` s 与 `autonomous_fixed_terminal_localization_distance=0.5` m，分别同步至包装的 `tracking_localization_timeout`／`terminal_localization_distance`；沿途时间不得小于严格 `localization_timeout`。包装的严格 `localization_timeout`、`resume_distance` 同步导航器既有参数，`resume_linear_acceleration=0.5`。0.5 m/s 常规上限、制动参数、0.01 m/s 末端接近速度和原有到点容差保持。
 
 2026-10-30 连续性与末端接近调整：按主人最新要求修改源码并完成 nav2_regulated_modules 定向 Release 编译；收尾增量构建 17.9 s 通过。已做差异空白及原模式保护文件哈希核对，未执行回归测试、Launch 解析测试或运行态验证，未操作后台。不能由编译通过推断到点时间、连续性或成功率改善。
 
@@ -62,7 +63,7 @@ Smac 内部平滑属于这一次请求；关闭额外 `SmoothPath`。输出通�
 
 ## 启动与配置
 
-实车规控入口和 `myworld_bringup` 仿真均使用 `/motion_state` 的 `byd_custom_msgs/msg/MotionState`；实车 YAML 显式设置导航器 `velocity_odom_topic`，使停稳判断与速度观测同样使用 `v_car/w_car`。Gazebo 原始 `/odometry` 保留为转换输入，反馈源 Header 保持。控制包装及导航器按话题末段 `motion_state` 选择消息类型，其余反馈话题保留 Odometry 兼容；自定义参数文件省略该字段时仍沿用 C++ 默认 `/odometry`。消息只转换为内部速度快照，不提供定位位姿；原 TF、速度时效、停稳和恢复阈值保持。
+实车规控入口和 `myworld_bringup` 仿真均使用 `/motion_state` 的 `byd_custom_msgs/msg/MotionState`；实车 YAML 显式设置导航器 `velocity_odom_topic`，使停稳判断与速度观测同样使用 `v_car/w_car`。Gazebo 原始 `/odometry` 保留为转换输入，反馈源 Header 保持。控制包装及导航器按话题末段 `motion_state` 选择消息类型，其余反馈话题保留 Odometry 兼容；自定义参数文件省略该字段时仍沿用 C++ 默认 `/odometry`。消息只转换为内部速度快照，不提供定位位姿；速度反馈 0.2 s 时效与停稳阈值保持。
 
 运行验证必须先在独立终端启动主人指定的定位模块，并保持运行：
 

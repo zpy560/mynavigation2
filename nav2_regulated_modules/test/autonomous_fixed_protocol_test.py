@@ -39,6 +39,9 @@ class Driver(Node):
         self.cusp = False
         self.downstream = False
         self.running = True
+        self.phase_override = None
+        self.suppress_status = False
+        self.zero_commands = 0
         self.plans = 0
         self.follows = 0
         self.frozen = []
@@ -48,6 +51,7 @@ class Driver(Node):
         self.status = self.create_publisher(String, 'autonomous_fixed/execution_status', 10)
         self.raw = self.create_publisher(Twist, 'cmd_vel_nav', 10)
         self.final = self.create_publisher(Twist, 'cmd_vel', 10)
+        self.create_subscription(Twist, 'cmd_vel_nav', self.observe_command, 10)
         self.create_subscription(NavPath, 'autonomous_fixed/plan', lambda message: self.frozen.append(message), 10)
         self.create_timer(0.02, self.tick, callback_group=self.group)
         self.planner = ActionServer(self, ComputePathToPose, 'compute_path_to_pose', self.plan, callback_group=self.group)
@@ -55,6 +59,10 @@ class Driver(Node):
         self.controller = ActionServer(self, FollowPath, 'follow_path', self.follow,
                                        cancel_callback=lambda goal: CancelResponse.ACCEPT, callback_group=self.group)
         self.client = ActionClient(self, NavigateToPose, 'navigate_to_pose', callback_group=self.group)
+
+    def observe_command(self, message):
+        if message.linear.x == 0.0 and message.angular.z == 0.0:
+            self.zero_commands += 1
 
     def tick(self):
         stamp = self.get_clock().now().to_msg()
@@ -104,16 +112,17 @@ class Driver(Node):
             if goal.is_cancel_requested:
                 goal.canceled()
                 return FollowPath.Result()
-            if not self.block and self.emit_tf:
+            if not self.block and self.emit_tf and not self.phase_override:
                 error = path.poses[-1].pose.position.x - self.x
                 self.x += max(-0.003, min(0.003, error))
             index = min(range(len(path.poses)), key=lambda i: abs(path.poses[i].pose.position.x - self.x))
             raw = Twist()
-            raw.linear.x = 0.1
+            raw.linear.x = 0.0 if self.phase_override else 0.1
             self.raw.publish(raw)
             self.final.publish(Twist() if self.block else raw)
-            phase = 'WAIT_OBSTACLE' if self.block and not self.downstream else 'TRACKING'
-            self.status.publish(String(data=json.dumps({'execution_id': execution, 'point_index': index, 'phase': phase}, separators=(',', ':'))))
+            phase = self.phase_override or ('WAIT_OBSTACLE' if self.block and not self.downstream else 'TRACKING')
+            if not self.suppress_status:
+                self.status.publish(String(data=json.dumps({'execution_id': execution, 'point_index': index, 'phase': phase}, separators=(',', ':'))))
             if abs(path.poses[-1].pose.position.x - self.x) < 1e-6 and not self.block:
                 time.sleep(0.15)
                 goal.succeed()
@@ -173,6 +182,8 @@ def main():
     def start():
         driver.block = False
         driver.emit_tf = True
+        driver.phase_override = None
+        driver.suppress_status = False
         plans, follows, frozen = driver.plans, driver.follows, len(driver.frozen)
         request = NavigateToPose.Goal()
         request.pose.header.frame_id = 'map'
@@ -186,7 +197,7 @@ def main():
         transition(Transition.TRANSITION_CONFIGURE)
         transition(Transition.TRANSITION_ACTIVATE)
         wait(lambda: driver.client.server_is_ready())
-        for scenario in ['normal', 'multi_cusp', 'localization_short_pause', 'localization_resume', 'obstacle_resume', 'downstream_stop_resume', 'obstacle_timeout', 'planning_failure', 'control_failure', 'cancel']:
+        for scenario in ['normal', 'multi_cusp', 'navigator_tf_delay', 'localization_short_pause', 'localization_resume', 'pause_timeout', 'paused_status_timeout', 'obstacle_resume', 'downstream_stop_resume', 'obstacle_timeout', 'planning_failure', 'control_failure', 'cancel']:
             driver.fail_plan = scenario == 'planning_failure'
             driver.fail_control = scenario == 'control_failure'
             driver.cusp = scenario == 'multi_cusp'
@@ -194,10 +205,24 @@ def main():
             handle, done, plans, follows, frozen = start()
             if scenario not in ['planning_failure', 'control_failure']:
                 wait(lambda: driver.follows > follows)
-            if scenario in ['localization_short_pause', 'localization_resume']:
+            if scenario == 'navigator_tf_delay':
+                time.sleep(0.1)
+                zero_commands = driver.zero_commands
                 driver.emit_tf = False
-                time.sleep(0.35 if scenario == 'localization_short_pause' else 1.0)
+                time.sleep(0.4)
+                assert driver.follows - follows == 1 and driver.zero_commands == zero_commands, 'Navigator TF cache must not issue duplicate stops or cancel healthy controller execution'
                 driver.emit_tf = True
+            elif scenario in ['localization_short_pause', 'localization_resume', 'pause_timeout', 'paused_status_timeout']:
+                driver.phase_override = 'WAIT_LOCALIZATION' if scenario == 'localization_resume' else 'PAUSED_LOCALIZATION'
+                if scenario == 'paused_status_timeout':
+                    time.sleep(0.3)
+                    driver.suppress_status = True
+                elif scenario != 'pause_timeout':
+                    driver.emit_tf = False
+                    time.sleep(0.7 if scenario == 'localization_short_pause' else 1.0)
+                    driver.emit_tf = True
+                    time.sleep(0.2)
+                    driver.phase_override = None
             elif scenario in ['obstacle_resume', 'downstream_stop_resume', 'obstacle_timeout']:
                 driver.block = True
                 if scenario in ['obstacle_resume', 'downstream_stop_resume']:
@@ -206,13 +231,13 @@ def main():
             elif scenario == 'cancel':
                 result(handle.cancel_goal_async())
             status = result(done).status
-            expected = 6 if scenario in ['obstacle_timeout', 'planning_failure', 'control_failure'] else 5 if scenario == 'cancel' else 4
+            expected = 6 if scenario in ['obstacle_timeout', 'planning_failure', 'control_failure', 'pause_timeout', 'paused_status_timeout'] else 5 if scenario == 'cancel' else 4
             assert status == expected, (scenario, status, expected)
             assert driver.plans - plans == 1, (scenario, 'replanning detected')
             assert len(driver.frozen) - frozen == (0 if scenario == 'planning_failure' else 1)
             if scenario == 'localization_resume':
                 assert driver.follows - follows == 2, 'Original path must be redispatched after localization recovery'
-            if scenario == 'localization_short_pause':
+            if scenario in ['localization_short_pause', 'navigator_tf_delay']:
                 assert driver.follows - follows == 1, 'Short localization pause must retain the existing FollowPath'
             if scenario == 'multi_cusp':
                 assert driver.follows - follows == 3, 'Two cusps require three fixed-direction FollowPath calls'

@@ -73,17 +73,19 @@ int main(int argc, char ** argv)
   }
   rclcpp::executors::SingleThreadedExecutor executor;
   executor.add_node(parent->get_node_base_interface());
-  const auto compute = [&](const geometry_msgs::msg::PoseStamped & input, const bool feedback = true, const double linear = 0.0, const double angular = 0.0, const double source_age = 0.0)
+  const auto compute = [&](const geometry_msgs::msg::PoseStamped & input, const bool feedback = true, const double linear = 0.0, const double angular = 0.0, const double source_age = 0.0, const double tf_age = 0.0)
   {
     geometry_msgs::msg::Twist measured;
     measured.linear.x = linear;
     measured.angular.z = angular;
     geometry_msgs::msg::TransformStamped transform;
     transform.header.frame_id = "map";
-    transform.header.stamp = parent->now();
+    transform.header.stamp = parent->now() - rclcpp::Duration::from_seconds(tf_age);
     transform.child_frame_id = "base_link";
     transform.transform.translation.x = input.pose.position.x;
     transform.transform.rotation = input.pose.orientation;
+    // 延迟输入不能被上一帧更新鲜的测试缓存遮蔽。
+    tf->clear();
     tf->setTransform(transform, "isolated_test", false);
     if (feedback)
     {
@@ -208,7 +210,41 @@ int main(int argc, char ** argv)
   }
   require(controller.isTerminalStopLatched(), "trimmed position still needs braking and full strict acceptance");
   controller.setSpeedLimit(nav2_costmap_2d::NO_SPEED_LIMIT, false);
-  path.poses.back() = point(0.2);
+  path.poses =
+  {
+    point(0), point(0.5), point(1.0), point(1.5), point(2.0)
+  };
+  controller.setPlan(path);
+  command = compute(point(0), true, 0.0, 0.0, 0.0, 0.4);
+  require(command.twist.linear.x == 0.0 && command.twist.angular.z == 0.0, "delayed TF cannot start a new execution");
+  for (int i = 0; i < 25; ++i)
+  {
+    command = compute(point(0));
+  }
+  require(command.twist.linear.x > 0.0, "fresh source frames recover the existing execution");
+  for (int i = 0; i < 45; ++i)
+  {
+    command = compute(point(0), true, 0.1, 0.0, 0.0, 0.45);
+    require(command.twist.linear.x > 0.0 && !controller.isTerminalStopLatched(), "ongoing tracking tolerates the recorded bounded TF delay");
+  }
+  command = compute(point(0), true, 0.0, 0.0, 1.0, 0.45);
+  require(command.twist.linear.x == 0.0 && command.twist.angular.z == 0.0, "tracking TF tolerance never bypasses stale feedback");
+  controller.setPlan(path);
+  compute(point(0));
+  command = compute(point(1.7), true, 0.0, 0.0, 0.0, 0.45);
+  require(command.twist.linear.x == 0.0 && command.twist.angular.z == 0.0 && !controller.isTerminalStopLatched(), "terminal zone rejects delayed TF before acceptance");
+  controller.setPlan(path);
+  compute(point(0));
+  command = compute(point(0), true, 0.0, 0.0, 0.0, 0.7);
+  require(command.twist.linear.x == 0.0 && command.twist.angular.z == 0.0, "TF beyond the tracking limit still stops");
+  controller.setPlan(path);
+  compute(point(0));
+  command = compute(point(0), true, 0.0, 0.0, 0.0, -0.2);
+  require(command.twist.linear.x == 0.0 && command.twist.angular.z == 0.0, "future TF is never admitted by tracking tolerance");
+  path.poses =
+  {
+    point(0), point(0.2)
+  };
   active_checker = &checker;
   path.poses.back() = point(0.2, 1.0);
   controller.setPlan(path);

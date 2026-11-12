@@ -6,7 +6,6 @@
 #include "pluginlib/class_list_macros.hpp"
 #include <sstream>
 #include <iomanip>
-#include <regex>
 
 namespace nav2_regulated_modules
 {
@@ -57,6 +56,8 @@ void AutonomousFixedPathController::configure(const rclcpp_lifecycle::LifecycleN
   max_accel_ = parameter("max_angular_acceleration", 0.8);
   obstacle_timeout_ = parameter("obstacle_timeout", 60.0);
   localization_timeout_ = parameter("localization_timeout", 0.3);
+  tracking_localization_timeout_ = parameter("tracking_localization_timeout", std::max(0.6, localization_timeout_));
+  terminal_localization_distance_ = parameter("terminal_localization_distance", 0.5);
   short_pause_timeout_ = parameter("short_pause_timeout", 0.5);
   resume_stable_duration_ = parameter("resume_stable_duration", 0.15);
   resume_distance_ = parameter("resume_distance", 0.2);
@@ -64,6 +65,10 @@ void AutonomousFixedPathController::configure(const rclcpp_lifecycle::LifecycleN
   if (resume_stable_duration_ >= short_pause_timeout_)
   {
     throw std::invalid_argument("Autonomous fixed resume stability must fit inside the short pause window");
+  }
+  if (tracking_localization_timeout_ < localization_timeout_)
+  {
+    throw std::invalid_argument("Autonomous fixed tracking localization timeout must cover the strict timeout");
   }
   period_ = 1.0 / node_->get_parameter("controller_frequency").as_double();
   collision_ = std::make_unique<nav2_costmap_2d::FootprintCollisionChecker<nav2_costmap_2d::Costmap2D *>>(costmap_->getCostmap());
@@ -95,27 +100,6 @@ void AutonomousFixedPathController::configure(const rclcpp_lifecycle::LifecycleN
       has_odom_ = true;
     });
   }
-  localization_gate_sub_ = node_->create_subscription<std_msgs::msg::String>("autonomous_fixed/localization_gate", rclcpp::QoS(10), [this](std_msgs::msg::String::ConstSharedPtr sample)
-  {
-    std::lock_guard<std::mutex> lock(mutex_);
-    static const std::regex format(R"gate(\{"execution_id":([0-9]+),"paused":(true|false)\})gate");
-    std::smatch match;
-    if (path_.poses.empty() || !std::regex_match(sample->data, match, format))
-    {
-      return;
-    }
-    try
-    {
-      if (std::stoll(match[1].str()) == rclcpp::Time(path_.header.stamp).nanoseconds())
-      {
-        navigation_pause_requested_ = match[2].str() == "true";
-      }
-    }
-    catch (const std::exception &)
-    {
-      // 无效或迟到执行编号不得改变当前控制状态。
-    }
-  });
 }
 
 void AutonomousFixedPathController::activate()
@@ -129,7 +113,7 @@ void AutonomousFixedPathController::deactivate()
   ready_ = false;
   terminal_review_.reset();
   trim_.reset();
-  localization_pause_since_.reset();
+  localization_pause_.reset();
   last_localized_pose_.reset();
   resume_ramp_active_ = false;
   tracker_.deactivate();
@@ -139,7 +123,6 @@ void AutonomousFixedPathController::cleanup()
 {
   tracker_.cleanup();
   odom_sub_.reset();
-  localization_gate_sub_.reset();
   status_pub_.reset();
   collision_.reset();
   costmap_.reset();
@@ -173,10 +156,9 @@ void AutonomousFixedPathController::setPlan(const nav_msgs::msg::Path & path)
   trim_resume_since_.reset();
   blocked_.reset();
   clear_.reset();
-  navigation_pause_requested_ = false;
   localization_hard_wait_ = false;
   localization_hard_reason_.clear();
-  localization_pause_since_.reset();
+  localization_pause_.reset();
   localization_fresh_since_.reset();
   localization_fresh_frames_ = 0;
   localization_latest_stamp_ = 0.0;
@@ -253,13 +235,10 @@ void AutonomousFixedPathController::status(const std::string & phase)
 
 bool AutonomousFixedPathController::pauseForLocalization(const bool valid, const geometry_msgs::msg::PoseStamped & pose, const geometry_msgs::msg::Twist & measured, const double stamp, const double steady_time)
 {
-  if (!valid || localization_pause_since_ || localization_hard_wait_)
+  if (!valid || localization_pause_.paused_since || localization_hard_wait_)
   {
-    if (!localization_pause_since_)
-    {
-      localization_pause_since_ = steady_time;
-    }
-    diagnostic_pause_duration_ = std::max(0.0, steady_time - *localization_pause_since_);
+    const bool invalid_expired = localization_pause_.update(valid, steady_time, short_pause_timeout_);
+    diagnostic_pause_duration_ = localization_pause_.duration(steady_time);
     // 只清连续验收；已消耗的位置复核时间、微调次数／位移／截止时间继续保留。
     ready_ = false;
     terminal_review_.brake_complete = false;
@@ -270,19 +249,26 @@ bool AutonomousFixedPathController::pauseForLocalization(const bool valid, const
     trim_confirm_stamp_.reset();
     trim_resume_since_.reset();
     clear_.reset();
-    if (!localization_hard_wait_ && (steady_time < *localization_pause_since_ || diagnostic_pause_duration_ >= short_pause_timeout_))
+    if (!localization_hard_wait_ && invalid_expired)
     {
       localization_hard_wait_ = true;
       localization_hard_reason_ = "SHORT_PAUSE_EXPIRED";
     }
     if (valid && !localization_hard_wait_)
     {
+      // 首次启动曾缺数据时，用第一帧新鲜定位建立恢复基准，仍等待后续源帧稳定。
+      if (!last_localized_pose_)
+      {
+        last_localized_pose_ = pose;
+        last_localized_time_ = steady_time;
+        last_localized_stamp_ = stamp;
+      }
       // 旧位姿可能已滞后接近 TF 门限；按源时间间隔允许真实运动，不能只用本地接收间隔。
       const double elapsed = std::max(std::max(0.0, steady_time - last_localized_time_), stamp - last_localized_stamp_);
       detail::FixedSegment segment;
       segment.last = path_.poses.size() - 1;
       const auto nearest = detail::advanceFixedCursor(path_, segment, cursor_, pose);
-      if (!last_localized_pose_ || stamp < last_localized_stamp_ || (localization_fresh_since_ && stamp < localization_latest_stamp_) || (!rotation_only_ && measured.linear.x * trim_direction_ < -0.01) || detail::fixedDistance(pose, *last_localized_pose_) > base_linear_speed_ * elapsed + 0.05 || std::abs(detail::fixedAngle(tf2::getYaw(pose.pose.orientation) - tf2::getYaw(last_localized_pose_->pose.orientation))) > max_angular_ * elapsed + 0.1 || detail::fixedDistance(pose, path_.poses[nearest]) > resume_distance_)
+      if (stamp < last_localized_stamp_ || (localization_fresh_since_ && stamp < localization_latest_stamp_) || (!rotation_only_ && measured.linear.x * trim_direction_ < -0.01) || detail::fixedDistance(pose, *last_localized_pose_) > base_linear_speed_ * elapsed + 0.05 || std::abs(detail::fixedAngle(tf2::getYaw(pose.pose.orientation) - tf2::getYaw(last_localized_pose_->pose.orientation))) > max_angular_ * elapsed + 0.1 || detail::fixedDistance(pose, path_.poses[nearest]) > resume_distance_)
       {
         localization_hard_wait_ = true;
         localization_hard_reason_ = "RESUME_POSE_DISCONTINUITY";
@@ -303,7 +289,7 @@ bool AutonomousFixedPathController::pauseForLocalization(const bool valid, const
         }
         if (localization_fresh_frames_ >= 2 && stamp > localization_first_fresh_stamp_ && steady_time - *localization_fresh_since_ >= resume_stable_duration_)
         {
-          localization_pause_since_.reset();
+          localization_pause_.reset();
           localization_fresh_since_.reset();
           resume_command_ = measured;
           resume_command_time_ = steady_time;
@@ -571,23 +557,29 @@ geometry_msgs::msg::TwistStamped AutonomousFixedPathController::computeVelocityC
   {
     localization_reason_ = !has_odom_ ? "ODOM_MISSING" : !std::isfinite(measured.linear.x) || !std::isfinite(measured.linear.y) || !std::isfinite(measured.angular.z) ? "ODOM_INVALID" : odom_age < -0.05 ? "ODOM_FUTURE" : odom_age > 0.2 ? "ODOM_STAMP_STALE" : "ODOM_RECEIVE_STALE";
   }
-  else if (!transform_available || !detail::freshAutonomousTransform(tf_age, localization_timeout_))
+  else if (!transform_available)
   {
-    localization_reason_ = !transform_available ? "TF_UNAVAILABLE" : tf_age < -0.05 ? "TF_FUTURE" : "TF_STALE";
+    localization_reason_ = "TF_UNAVAILABLE";
   }
-  else if (navigation_pause_requested_)
-  {
-    localization_reason_ = "NAVIGATOR_TF_UNAVAILABLE";
-  }
-  const bool localized = localization_reason_ == "NONE";
   geometry_msgs::msg::PoseStamped robot;
-  if (!localized || pose.header.frame_id == path_.header.frame_id)
+  if (localization_reason_ != "NONE" || pose.header.frame_id == path_.header.frame_id)
   {
     robot = pose;
   }
   else
   {
     tf_->transform(pose, robot, path_.header.frame_id, tf2::durationFromSec(0.0));
+  }
+  const double goal_distance = detail::fixedDistance(robot, path_.poses.back());
+  const double allowed_tf_age = detail::fixedLocalizationTimeout(last_localized_pose_.has_value(), terminal_, goal_distance, localization_timeout_, tracking_localization_timeout_, terminal_localization_distance_, base_linear_speed_, terminal_capture_margin_);
+  if (localization_reason_ == "NONE" && !detail::freshAutonomousTransform(tf_age, allowed_tf_age))
+  {
+    localization_reason_ = tf_age < -0.05 ? "TF_FUTURE" : "TF_STALE";
+  }
+  const bool localized = localization_reason_ == "NONE";
+  if (localized && tf_age > localization_timeout_)
+  {
+    localization_reason_ = "TF_DELAY_TOLERATED";
   }
   if (pauseForLocalization(localized, robot, measured, tf_stamp, steady_time))
   {

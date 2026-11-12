@@ -5,6 +5,7 @@
 #include <chrono>
 #include "nav2_regulated_modules/fixed_path_controller.hpp"
 #include "nav2_regulated_modules/detail/autonomous_fixed_path.hpp"
+#include "nav2_regulated_modules/detail/autonomous_fixed_localization.hpp"
 #include "nav2_regulated_modules/detail/autonomous_fixed_terminal_review.hpp"
 #include "nav2_regulated_modules/detail/autonomous_fixed_terminal_trim.hpp"
 #include "nav2_costmap_2d/footprint_collision_checker.hpp"
@@ -48,7 +49,6 @@ private:
   rclcpp_lifecycle::LifecycleNode::SharedPtr node_;
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr status_pub_;
   rclcpp::SubscriptionBase::SharedPtr odom_sub_;
-  rclcpp::Subscription<std_msgs::msg::String>::SharedPtr localization_gate_sub_;
   nav_msgs::msg::Odometry odom_;
   std::chrono::steady_clock::time_point odom_received_;
   bool has_odom_ = false;
@@ -80,14 +80,15 @@ private:
   double max_accel_ = 0.8;
   double obstacle_timeout_ = 60.0;
   double localization_timeout_ = 0.3;
+  double tracking_localization_timeout_ = 0.6;
+  double terminal_localization_distance_ = 0.5;
   double short_pause_timeout_ = 0.5;
   double resume_stable_duration_ = 0.15;
   double resume_distance_ = 0.2;
   double resume_linear_acceleration_ = 0.5;
-  bool navigation_pause_requested_ = false;
   bool localization_hard_wait_ = false;
   std::string localization_hard_reason_;
-  std::optional<double> localization_pause_since_;
+  detail::FixedLocalizationPauseTiming localization_pause_;
   std::optional<double> localization_fresh_since_;
   double localization_first_fresh_stamp_ = 0.0;
   double localization_latest_stamp_ = 0.0;

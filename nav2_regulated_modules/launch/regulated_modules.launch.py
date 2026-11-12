@@ -154,13 +154,22 @@ class NavigationRewrittenYaml(RewrittenYaml):
         speed = float(navigator.get('autonomous_fixed_max_speed', 0.5))
         short_pause_timeout = float(navigator.get('autonomous_fixed_short_pause_timeout', 0.5))
         resume_stable_duration = float(navigator.get('autonomous_fixed_resume_stable_duration', 0.15))
+        localization_timeout = float(navigator.get('localization_timeout', 0.3))
+        tracking_localization_timeout = float(navigator.get('autonomous_fixed_tracking_localization_timeout', max(0.6, localization_timeout)))
+        terminal_localization_distance = float(navigator.get('autonomous_fixed_terminal_localization_distance', 0.5))
+        if (not all(math.isfinite(value) and value > 0.0 for value in
+                    [localization_timeout, tracking_localization_timeout, terminal_localization_distance])
+                or tracking_localization_timeout < localization_timeout):
+            raise ValueError('autonomous_fixed localization timeouts and terminal distance must be positive; tracking timeout must cover the strict timeout')
         navigator.update(operation_mode='autonomous_fixed', planner_id='SmacHybrid',
                          controller_id='AutonomousFixedPathController',
                          goal_checker_id='autonomous_fixed_goal_checker', use_smoother=False,
                          progress_timeout=10.0, replan_frequency=1.0,
                          autonomous_fixed_xy_tolerance=final_xy,
                          autonomous_fixed_short_pause_timeout=short_pause_timeout,
-                         autonomous_fixed_resume_stable_duration=resume_stable_duration)
+                         autonomous_fixed_resume_stable_duration=resume_stable_duration,
+                         autonomous_fixed_tracking_localization_timeout=tracking_localization_timeout,
+                         autonomous_fixed_terminal_localization_distance=terminal_localization_distance)
         planner = config['planner_server']['ros__parameters']
         planner['planner_plugins'] = ['SmacHybrid']
         planner['selected_planner'] = 'SmacHybrid'
@@ -192,7 +201,9 @@ class NavigationRewrittenYaml(RewrittenYaml):
             'terminal_trim_max_distance': 0.03, 'terminal_trim_timeout': 5.0,
             'terminal_trim_max_attempts': 2, 'terminal_trim_confirm_duration': 0.2,
             'max_angular_velocity': 0.4, 'max_angular_acceleration': 0.8,
-            'localization_timeout': float(navigator.get('localization_timeout', 0.3)),
+            'localization_timeout': localization_timeout,
+            'tracking_localization_timeout': tracking_localization_timeout,
+            'terminal_localization_distance': terminal_localization_distance,
             'short_pause_timeout': short_pause_timeout,
             'resume_stable_duration': resume_stable_duration,
             'resume_distance': float(navigator.get('autonomous_fixed_resume_distance', 0.2)),

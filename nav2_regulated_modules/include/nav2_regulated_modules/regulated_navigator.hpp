@@ -116,7 +116,6 @@ private:
   std::optional<std::chrono::steady_clock::time_point> frozen_soft_pause_since_;
   std::string frozen_localization_reason_;
   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr frozen_status_sub_;
-  rclcpp_lifecycle::LifecyclePublisher<std_msgs::msg::String>::SharedPtr frozen_localization_gate_pub_;
   rclcpp_lifecycle::LifecyclePublisher<nav_msgs::msg::Path>::SharedPtr frozen_path_pub_;
 
   // 仅接受 autonomous 且激活的有效单点 Pose；behavior_tree 非空会拒绝。

@@ -61,6 +61,8 @@ RegulatedNavigator::RegulatedNavigator(const rclcpp::NodeOptions & options) : na
   {
     declare_parameter("autonomous_fixed_short_pause_timeout", 0.5);
     declare_parameter("autonomous_fixed_resume_stable_duration", 0.15);
+    declare_parameter("autonomous_fixed_tracking_localization_timeout", 0.6);
+    declare_parameter("autonomous_fixed_terminal_localization_distance", 0.5);
   }
   declare_parameter("max_consecutive_planning_failures", 3);
   declare_parameter("max_recovery_rounds", 2);
@@ -304,7 +306,7 @@ nav2_util::CallbackReturn RegulatedNavigator::on_configure(const rclcpp_lifecycl
   {
     const std::vector<std::string> fixed_parameters =
     {
-      "autonomous_fixed_max_speed", "autonomous_fixed_xy_tolerance", "autonomous_fixed_yaw_tolerance", "autonomous_fixed_obstacle_timeout", "autonomous_fixed_resume_distance", "autonomous_fixed_short_pause_timeout", "autonomous_fixed_resume_stable_duration"
+      "autonomous_fixed_max_speed", "autonomous_fixed_xy_tolerance", "autonomous_fixed_yaw_tolerance", "autonomous_fixed_obstacle_timeout", "autonomous_fixed_resume_distance", "autonomous_fixed_short_pause_timeout", "autonomous_fixed_resume_stable_duration", "autonomous_fixed_tracking_localization_timeout", "autonomous_fixed_terminal_localization_distance"
     };
     for (const auto & parameter : fixed_parameters)
     {
@@ -322,7 +324,6 @@ nav2_util::CallbackReturn RegulatedNavigator::on_configure(const rclcpp_lifecycl
     {
       throw std::invalid_argument("Autonomous fixed resume stability must fit inside the short pause window");
     }
-    frozen_localization_gate_pub_ = create_publisher<std_msgs::msg::String>("autonomous_fixed/localization_gate", rclcpp::QoS(10));
     frozen_status_sub_ = create_subscription<std_msgs::msg::String>("autonomous_fixed/execution_status", rclcpp::QoS(10), std::bind(&RegulatedNavigator::onFixedExecutionStatus, this, std::placeholders::_1));
     frozen_path_pub_ = create_publisher<nav_msgs::msg::Path>("autonomous_fixed/plan", rclcpp::QoS(1).reliable().transient_local());
   }
@@ -370,10 +371,6 @@ nav2_util::CallbackReturn RegulatedNavigator::on_activate(const rclcpp_lifecycle
   {
     frozen_path_pub_->on_activate();
   }
-  if (frozen_localization_gate_pub_)
-  {
-    frozen_localization_gate_pub_->on_activate();
-  }
   collision_state_.reset();
   collision_progress_paused_ = false;
   if (fixed_path_pub_)
@@ -402,10 +399,6 @@ nav2_util::CallbackReturn RegulatedNavigator::on_deactivate(const rclcpp_lifecyc
   {
     frozen_path_pub_->on_deactivate();
   }
-  if (frozen_localization_gate_pub_)
-  {
-    frozen_localization_gate_pub_->on_deactivate();
-  }
   active_ = false;
   if (chassis_control_subscriber_)
   {
@@ -432,7 +425,6 @@ nav2_util::CallbackReturn RegulatedNavigator::on_deactivate(const rclcpp_lifecyc
 nav2_util::CallbackReturn RegulatedNavigator::on_cleanup(const rclcpp_lifecycle::State &)
 {
   frozen_status_sub_.reset();
-  frozen_localization_gate_pub_.reset();
   frozen_path_pub_.reset();
   collision_state_sub_.reset();
   collision_params_handler_.reset();

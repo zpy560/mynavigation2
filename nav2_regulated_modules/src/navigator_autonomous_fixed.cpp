@@ -193,14 +193,13 @@ void RegulatedNavigator::monitorFixedAutonomy()
   const bool localized = lookupCurrentPose(pose);
   const bool controller_lost = frozen_phase_ == "WAIT_LOCALIZATION";
   const bool controller_paused = frozen_phase_ == "PAUSED_LOCALIZATION";
-  if (frozen_follow_inflight_ && !frozen_localization_wait_ && frozen_localization_gate_pub_)
+  if (frozen_follow_inflight_ && (time < frozen_status_since_ || time - frozen_status_since_ > 2.0))
   {
-    // 同一 execution 的定位门控交给控制包装持续执行，避免三帧零速与正常控制争用。
-    std_msgs::msg::String gate;
-    gate.data = "{\"execution_id\":" + std::to_string(frozen_execution_id_) + ",\"paused\":" + (localized ? "false}" : "true}");
-    frozen_localization_gate_pub_->publish(gate);
+    failTask("固定路径执行状态超时");
+    return;
   }
-  if ((!localized || controller_paused) && !controller_lost && frozen_follow_inflight_ && !frozen_localization_wait_)
+  // 行走中的暂停只认当前执行状态，导航器的另一份 TF 缓存不再重复门控速度。
+  if (controller_paused && frozen_follow_inflight_ && !frozen_localization_wait_)
   {
     const auto steady_now = std::chrono::steady_clock::now();
     if (!frozen_soft_pause_since_)
@@ -209,18 +208,15 @@ void RegulatedNavigator::monitorFixedAutonomy()
       LOG_INFO("自主冻结路径短时暂停，保留 FollowPath，execution={}，navigator_tf_valid={}", frozen_execution_id_, localized);
     }
     const double paused = std::chrono::duration<double>(steady_now - *frozen_soft_pause_since_).count();
-    if (paused < get_parameter("autonomous_fixed_short_pause_timeout").as_double() && time >= frozen_status_since_ && time - frozen_status_since_ <= 0.4)
+    if (paused > localization_recovery_timeout_)
     {
-      if (!localized)
-      {
-        stopRobot();
-      }
-      frozen_inhibited_since_.reset();
-      task_.last_progress_time = now();
-      return;
+      failTask("原 Action 定位或速度反馈暂停超过恢复上限");
     }
+    frozen_inhibited_since_.reset();
+    task_.last_progress_time = now();
+    return;
   }
-  if (!localized || controller_lost || controller_paused)
+  if (controller_lost)
   {
     frozen_soft_pause_since_.reset();
     if (!frozen_localization_wait_)
@@ -261,7 +257,7 @@ void RegulatedNavigator::monitorFixedAutonomy()
       failTask("等待新鲜定位、停稳或旧执行结束超时");
       return;
     }
-    if (!detail::autonomousSettled(fixedVelocityStopped() && frozen_outstanding_follows_ == 0, time, localization_stable_duration_, frozen_stable_since_))
+    if (!detail::autonomousSettled(localized && fixedVelocityStopped() && frozen_outstanding_follows_ == 0, time, localization_stable_duration_, frozen_stable_since_))
     {
       return;
     }
@@ -327,6 +323,12 @@ void RegulatedNavigator::monitorFixedAutonomy()
   else
   {
     frozen_obstacle_since_ = -1.0;
+    if (!localized)
+    {
+      // 沿途宽限期间只暂缓导航器几何进度；包装仍检查反馈、TF 上限和碰撞。
+      task_.last_progress_time = now();
+      return;
+    }
     const double moved = detail::fixedDistance(pose, task_.last_progress_pose);
     const double rotated = std::abs(detail::fixedAngle(tf2::getYaw(pose.pose.orientation) - tf2::getYaw(task_.last_progress_pose.pose.orientation)));
     if (moved >= 0.01 || rotated >= 0.05)
@@ -340,16 +342,14 @@ void RegulatedNavigator::monitorFixedAutonomy()
       return;
     }
   }
-  if (time - frozen_status_since_ > 2.0)
-  {
-    failTask("固定路径执行状态超时");
-    return;
-  }
   task_.distance_remaining = 0.0;
   for (std::size_t i = frozen_cursor_ + 1; i < frozen_path_.poses.size(); ++i)
   {
     task_.distance_remaining += detail::fixedDistance(frozen_path_.poses[i - 1], frozen_path_.poses[i]);
   }
-  task_.distance_remaining = std::max(task_.distance_remaining, detail::fixedDistance(pose, task_.goal));
+  if (localized)
+  {
+    task_.distance_remaining = std::max(task_.distance_remaining, detail::fixedDistance(pose, task_.goal));
+  }
 }
 }

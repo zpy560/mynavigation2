@@ -101,6 +101,8 @@ ros2 launch nav2_regulated_modules regulated_modules.launch.py \
 
 默认使用项目 Hybrid 包装、REEDS_SHEPP、10 m 距离查表和专用固定路径执行链。接收单点 Action 或 RViz 单点目标，拒绝 NavigateThroughPoses、NavigationService 和非空 `behavior_tree`。
 
+沿途由控制包装统一处理 TF 延迟，默认可用年龄上限 0.6 s；首次起步、旋转和终点附近仍按 0.3 s 严格检查。短暂停保留同一 FollowPath，连续失效计时与恢复稳定计时分开，导航器不重复发 TF 停车请求。参数及失效边界见 [暂停恢复说明](doc/autonomous_fixed_architecture.md#完成与暂停)；这不代表可脱离定位运行，实车连续性与终点精度仍需新日志验收。
+
 ```bash
 ros2 launch nav2_regulated_modules regulated_modules.launch.py \
   operation_mode:=autonomous_fixed use_rviz:=false use_sim_time:=false \

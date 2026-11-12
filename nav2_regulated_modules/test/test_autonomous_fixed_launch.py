@@ -2,6 +2,7 @@
 import importlib.util
 from pathlib import Path
 import unittest
+import tempfile
 import yaml
 from launch import LaunchContext
 
@@ -61,6 +62,10 @@ class AutonomousFixedLaunchTest(unittest.TestCase):
                     self.assertEqual(controller['AutonomousFixedPathController']['brake_stable_duration'], 0.2)
                     self.assertEqual(controller['AutonomousFixedPathController']['terminal_review_timeout'], 2.0)
                     self.assertEqual(controller['AutonomousFixedPathController']['terminal_capture_margin'], 0.02)
+                    self.assertEqual(navigator['autonomous_fixed_tracking_localization_timeout'], 0.6)
+                    self.assertEqual(controller['AutonomousFixedPathController']['localization_timeout'], navigator['localization_timeout'])
+                    self.assertEqual(controller['AutonomousFixedPathController']['tracking_localization_timeout'], 0.6)
+                    self.assertEqual(controller['AutonomousFixedPathController']['terminal_localization_distance'], 0.5)
                     self.assertEqual(controller['autonomous_fixed_cusp_checker']['xy_goal_tolerance'], 0.01)
                     self.assertFalse(controller['autonomous_fixed_goal_checker']['stateful'])
                     self.assertAlmostEqual(controller['autonomous_fixed_goal_checker']['xy_goal_tolerance'], 0.007)
@@ -68,6 +73,28 @@ class AutonomousFixedLaunchTest(unittest.TestCase):
                     self.assertEqual(tracker['goal_stop_entry_tolerance'], 0.005)
                     self.assertEqual(tracker['goal_final_approach_velocity'], 0.01)
                     self.assertEqual(tracker['goal_terminal_lookahead_min_dist'], 0.05)
+
+    def test_localization_overrides_and_invalid_profiles(self):
+        baseline = yaml.safe_load((ROOT / 'params/regulated_modules.yaml').read_text())
+        for tracking, terminal_distance, valid in [(0.8, 0.7, True), (0.3, 0.5, True), (0.2, 0.5, False), (float('nan'), 0.5, False), (0.6, 0.0, False)]:
+            with self.subTest(tracking=tracking, terminal_distance=terminal_distance):
+                navigator = baseline['regulated_navigator']['ros__parameters']
+                navigator['autonomous_fixed_tracking_localization_timeout'] = tracking
+                navigator['autonomous_fixed_terminal_localization_distance'] = terminal_distance
+                with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml') as source:
+                    yaml.safe_dump(baseline, source)
+                    source.flush()
+                    context = LaunchContext()
+                    context.launch_configurations.update(operation_mode='autonomous_fixed')
+                    rewrite = MODULE.NavigationRewrittenYaml(source_file=source.name, root_key='', param_rewrites={}, convert_types=True)
+                    if not valid:
+                        with self.assertRaises(ValueError):
+                            rewrite.perform(context)
+                        continue
+                    config = yaml.safe_load(Path(rewrite.perform(context)).read_text())
+                    controller = config['controller_server']['ros__parameters']['AutonomousFixedPathController']
+                    self.assertEqual(controller['tracking_localization_timeout'], tracking)
+                    self.assertEqual(controller['terminal_localization_distance'], terminal_distance)
 
 
 if __name__ == '__main__':
